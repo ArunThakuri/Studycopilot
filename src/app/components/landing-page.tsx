@@ -14,14 +14,14 @@ interface LandingPageProps {
   onLogin: () => void;
 }
 
+import logoSvg from '../../assets/logo.svg';
+import logoDarkSvg from '../../assets/logo-dark.svg';
+
 /* ─────────────────── LOGO ─────────────────── */
-export function StudyCopilotLogo({ className = '' }: { className?: string }) {
-  return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
-      <span className="text-2xl">📚</span>
-      <span className="font-display text-lg font-bold gradient-text">StudyCopilot</span>
-    </div>
-  );
+export function StudyCopilotLogo({ className = '', variant = 'default' }: { className?: string; variant?: 'default' | 'light' }) {
+  const { theme } = useTheme();
+  const isDark = variant === 'light' || theme === 'dark';
+  return <img src={isDark ? logoDarkSvg : logoSvg} alt="StudyCopilot" className={`h-7 w-auto ${className}`} />;
 }
 
 /* ─────────────────── TESTIMONIALS DATA ─────────────────── */

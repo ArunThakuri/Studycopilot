@@ -39,9 +39,9 @@ interface QuizQuestion {
 }
 
 const difficultyColors: Record<string, string> = {
-  easy: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  medium: 'bg-amber-100 text-amber-700 border-amber-200',
-  hard: 'bg-red-100 text-red-700 border-red-200',
+  easy: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  medium: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  hard: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
 };
 
 export function InteractiveLearning({ subject, unit, user, onBack, onNextModule, onPreviousModule, onRegenerate, onLogout, onOpenProfile, onNavigateHome }: InteractiveLearningProps) {
@@ -208,9 +208,9 @@ export function InteractiveLearning({ subject, unit, user, onBack, onNextModule,
             </div>
 
             <div className="mb-8">
-              {percentage >= 80 && <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4"><p className="text-emerald-800 font-bold">Excellent work! You've mastered this topic!</p></div>}
-              {percentage >= 60 && percentage < 80 && <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4"><p className="text-amber-800 font-bold">Good job! Review the questions you missed to improve.</p></div>}
-              {percentage < 60 && <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4"><p className="text-orange-800 font-bold">Keep practicing! Review the material and try again.</p></div>}
+              {percentage >= 80 && <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-2xl p-4"><p className="text-emerald-800 dark:text-emerald-300 font-bold">Excellent work! You've mastered this topic!</p></div>}
+              {percentage >= 60 && percentage < 80 && <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800 rounded-2xl p-4"><p className="text-amber-800 dark:text-amber-300 font-bold">Good job! Review the questions you missed to improve.</p></div>}
+              {percentage < 60 && <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 rounded-2xl p-4"><p className="text-orange-800 dark:text-orange-300 font-bold">Keep practicing! Review the material and try again.</p></div>}
             </div>
 
             <div className="flex gap-3 justify-center flex-wrap">
@@ -282,20 +282,20 @@ export function InteractiveLearning({ subject, unit, user, onBack, onNextModule,
               const showFeedback = hasSubmitted;
               let buttonClass = 'w-full p-4 sm:p-5 text-left border-2 rounded-2xl transition-all duration-200 font-semibold';
               if (showFeedback) {
-                if (isSelected && isCorrect) buttonClass += ' border-emerald-500 bg-emerald-50';
-                else if (isSelected && !isCorrect) buttonClass += ' border-red-500 bg-red-50';
-                else if (isCorrect) buttonClass += ' border-emerald-500 bg-emerald-50';
+                if (isSelected && isCorrect) buttonClass += ' border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30';
+                else if (isSelected && !isCorrect) buttonClass += ' border-red-500 bg-red-50 dark:bg-red-900/30';
+                else if (isCorrect) buttonClass += ' border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30';
                 else buttonClass += ' border-border bg-card opacity-50';
               } else {
-                if (isSelected) buttonClass += ' border-primary bg-primary/5 shadow-md';
-                else buttonClass += ' border-border bg-card hover:border-primary/30 hover:bg-muted/50';
+                if (isSelected) buttonClass += ' border-primary bg-primary/5 dark:bg-primary/10 shadow-md';
+                else buttonClass += ' border-border bg-card hover:border-primary/30 hover:bg-muted/50 dark:hover:bg-muted/30';
               }
               return (
                 <motion.button key={index} whileHover={!hasSubmitted ? { scale: 1.01 } : {}} whileTap={!hasSubmitted ? { scale: 0.99 } : {}} onClick={() => { if (!hasSubmitted) setSelectedAnswer(index); }} disabled={hasSubmitted} className={buttonClass}>
                   <div className="flex items-center justify-between">
                     <span className={`text-base sm:text-lg ${isSelected || (showFeedback && isCorrect) ? 'font-bold text-foreground' : 'text-foreground/80'}`}>{option}</span>
-                    {showFeedback && isCorrect && <div className="bg-emerald-100 rounded-full p-1"><Check className="w-5 h-5 text-emerald-600" /></div>}
-                    {showFeedback && isSelected && !isCorrect && <div className="bg-red-100 rounded-full p-1"><X className="w-5 h-5 text-red-600" /></div>}
+                    {showFeedback && isCorrect && <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-full p-1"><Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>}
+                    {showFeedback && isSelected && !isCorrect && <div className="bg-red-100 dark:bg-red-900/40 rounded-full p-1"><X className="w-5 h-5 text-red-600 dark:text-red-400" /></div>}
                   </div>
                 </motion.button>
               );
@@ -316,14 +316,14 @@ export function InteractiveLearning({ subject, unit, user, onBack, onNextModule,
             {hasSubmitted && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6">
                 {selectedAnswer === currentQuestion.correctAnswer ? (
-                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
-                    <div className="bg-emerald-100 p-2 rounded-full"><Award className="w-6 h-6 text-emerald-600" /></div>
-                    <div><p className="text-emerald-800 font-bold">Correct! Great job!</p><p className="text-emerald-600 text-sm font-semibold">You're mastering this topic.</p></div>
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 flex items-center gap-3">
+                    <div className="bg-emerald-100 dark:bg-emerald-900/40 p-2 rounded-full"><Award className="w-6 h-6 text-emerald-600 dark:text-emerald-400" /></div>
+                    <div><p className="text-emerald-800 dark:text-emerald-300 font-bold">Correct! Great job!</p><p className="text-emerald-600 dark:text-emerald-400 text-sm font-semibold">You're mastering this topic.</p></div>
                   </div>
                 ) : (
-                  <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-center gap-3">
-                    <div className="bg-red-100 p-2 rounded-full"><X className="w-6 h-6 text-red-600" /></div>
-                    <div><p className="text-red-800 font-bold">Not quite right</p><p className="text-red-600 text-sm font-semibold">Correct answer: <span className="font-bold">{currentQuestion.options[currentQuestion.correctAnswer]}</span></p></div>
+                  <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-center gap-3">
+                    <div className="bg-red-100 dark:bg-red-900/40 p-2 rounded-full"><X className="w-6 h-6 text-red-600 dark:text-red-400" /></div>
+                    <div><p className="text-red-800 dark:text-red-300 font-bold">Not quite right</p><p className="text-red-600 dark:text-red-400 text-sm font-semibold">Correct answer: <span className="font-bold">{currentQuestion.options[currentQuestion.correctAnswer]}</span></p></div>
                   </div>
                 )}
               </motion.div>

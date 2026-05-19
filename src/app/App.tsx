@@ -30,8 +30,9 @@ import { saveUserData, loadUserData } from './lib/data-service';
 
 import { Onboarding } from './components/onboarding';
 import { ThemeProvider } from './components/theme-provider';
+import { viewToPath, parsePath, findSubjectById, findUnitById, View as RouteView } from './lib/routing';
 
-type View = 'landing' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'dashboard' | 'select-subject' | 'create-subject' | 'units-dashboard' | 'create-unit' | 'learning-modules' | 'profile' | 'unit-text' | 'audio-lesson' | 'vocabulary' | 'summary' | 'exercises' | 'interactive' | 'practice' | 'model-question' | 'markdown-editor' | 'admin-panel';
+type View = RouteView;
 
 export interface Subject {
   id: string;
@@ -87,6 +88,7 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('landing');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [pendingAdminRedirect, setPendingAdminRedirect] = useState(false);
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
   const [subjects, setSubjects] = useState<Subject[]>(() => {
@@ -104,6 +106,7 @@ function App() {
   });
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [urlProcessed, setUrlProcessed] = useState(false);
   const [activities, setActivities] = useState<Activity[]>(() => {
     // Load activities from localStorage on initial mount
     const saved = localStorage.getItem('studycopilot_activities');
@@ -223,6 +226,7 @@ function App() {
         });
         setCurrentView('admin-panel');
         window.history.replaceState(null, '', window.location.pathname);
+        setIsSessionChecked(true);
         return;
       }
 
@@ -231,6 +235,7 @@ function App() {
         console.log('📸 Screenshot mode:', screenshotView);
 
         setCurrentView(screenshotView);
+        setIsSessionChecked(true);
         return;
       }
 
@@ -257,6 +262,7 @@ function App() {
           setCurrentView('login');
         }
         window.history.replaceState(null, '', window.location.pathname);
+        setIsSessionChecked(true);
         return;
       }
 
@@ -264,10 +270,10 @@ function App() {
       if (hash.includes('type=recovery') || hash.includes('recovery')) {
         console.log('🔄 Password reset callback detected');
         console.log('📍 Full URL:', window.location.href);
-        
+
         // Handle the OAuth callback to get the session
         const resetUser = await handleOAuthCallback();
-        
+
         if (resetUser) {
           console.log('✅ Password reset session established for:', resetUser.email);
           setUser({
@@ -282,6 +288,7 @@ function App() {
           });
           // Clean up URL hash
           window.history.replaceState(null, '', window.location.pathname);
+          setIsSessionChecked(true);
           return;
         } else {
           console.error('❌ Failed to establish reset session');
@@ -295,6 +302,7 @@ function App() {
           });
           setCurrentView('forgot-password');
           window.history.replaceState(null, '', window.location.pathname);
+          setIsSessionChecked(true);
           return;
         }
       }
@@ -332,6 +340,7 @@ function App() {
           toast.success(`Welcome, ${oauthUser.name}!`);
           // Clean up URL hash
           window.history.replaceState(null, '', window.location.pathname);
+          setIsSessionChecked(true);
           return;
         }
       }
@@ -403,6 +412,7 @@ function App() {
         console.log('ℹ️ No valid session, showing landing page');
         setCurrentView('landing');
       }
+      setIsSessionChecked(true);
     };
 
     checkSession();
@@ -416,6 +426,94 @@ function App() {
 
     return cleanup;
   }, []);
+
+  // ─────────────────── URL ROUTING ───────────────────
+
+  // 1. On initial load, after session + subjects are ready, restore view from URL
+  useEffect(() => {
+    if (urlProcessed) return;
+    // Wait until session check has completed
+    if (!isSessionChecked) return; // Still loading session
+
+    const route = parsePath(window.location.pathname);
+
+    // If not logged in, allow public routes
+    if (!user) {
+      const publicViews = ['landing', 'login', 'signup', 'forgot-password'];
+      if (publicViews.includes(route.view)) {
+        setCurrentView(route.view);
+      } else {
+        setCurrentView('landing');
+      }
+      setUrlProcessed(true);
+      return;
+    }
+
+    // If URL is the default path, let the session check's default stand
+    if (route.view === 'landing' || route.view === 'dashboard') {
+      setUrlProcessed(true);
+      return;
+    }
+
+    // Try to resolve subject/unit from URL
+    let targetView = route.view;
+    let targetSubject: Subject | null = selectedSubject;
+    let targetUnit: Unit | null = selectedUnit;
+
+    if (route.subjectId) {
+      const subject = findSubjectById(subjects, route.subjectId);
+      if (subject) {
+        targetSubject = subject;
+      } else {
+        targetView = 'dashboard'; // Subject not found
+      }
+    }
+
+    if (route.unitId) {
+      const result = findUnitById(subjects, route.unitId);
+      if (result) {
+        targetSubject = result.subject;
+        targetUnit = result.unit;
+      } else {
+        targetView = 'dashboard'; // Unit not found
+      }
+    }
+
+    if (targetSubject) setSelectedSubject(targetSubject);
+    if (targetUnit) setSelectedUnit(targetUnit);
+    setCurrentView(targetView);
+    setUrlProcessed(true);
+  }, [user, subjects, urlProcessed, selectedSubject, selectedUnit, isSessionChecked]);
+
+  // 2. Keep URL in sync with current view (after initial load is processed)
+  useEffect(() => {
+    if (!urlProcessed) return;
+    const path = viewToPath(currentView, selectedSubject?.id, selectedUnit?.id);
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+    }
+  }, [currentView, selectedSubject, selectedUnit, urlProcessed]);
+
+  // 3. Handle browser back/forward buttons
+  useEffect(() => {
+    const onPopState = () => {
+      const route = parsePath(window.location.pathname);
+      if (route.subjectId) {
+        const subject = findSubjectById(subjects, route.subjectId);
+        if (subject) setSelectedSubject(subject);
+      }
+      if (route.unitId) {
+        const result = findUnitById(subjects, route.unitId);
+        if (result) {
+          setSelectedSubject(result.subject);
+          setSelectedUnit(result.unit);
+        }
+      }
+      setCurrentView(route.view);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [subjects]);
 
   const handleLogin = async (email: string) => {
     // Get user data from stored session

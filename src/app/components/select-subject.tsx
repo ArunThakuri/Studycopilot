@@ -3,6 +3,7 @@ import { BookOpen, ArrowLeft, Search, Plus, BookMarked, LayoutGrid, List } from 
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { StudyCopilotLogo } from './landing-page';
 import { Card } from './ui/card';
 import { Subject } from '../App';
 
@@ -83,8 +84,7 @@ export function SelectSubject({ userGrade, onBack, onSelectExisting, onCreateNew
       <header className="sticky top-0 z-40 bg-card/70 backdrop-blur-2xl border-b-2 border-primary/10">
         <div className="flex items-center justify-between max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">📚</span>
-            <span className="font-display text-lg font-bold gradient-text">StudyCopilot</span>
+            <StudyCopilotLogo />
           </div>
         </div>
       </header>

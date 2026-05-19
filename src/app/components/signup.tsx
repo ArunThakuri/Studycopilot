@@ -3,6 +3,7 @@ import { Mail, User, Loader2, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { StudyCopilotLogo } from './landing-page';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { signUp, signInWithGoogle, signInWithGitHub } from '../lib/auth-service';
@@ -57,8 +58,7 @@ export function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
         <div className="absolute top-20 right-10 w-36 h-36 bg-secondary/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
         <div className="relative">
           <div className="flex items-center gap-2.5 mb-16">
-            <span className="text-3xl">📚</span>
-            <span className="font-display text-xl font-bold text-white">StudyCopilot</span>
+            <StudyCopilotLogo variant="light" />
           </div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -84,8 +84,7 @@ export function Signup({ onSignup, onSwitchToLogin }: SignupProps) {
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-2 lg:hidden">
-            <span className="text-2xl">📚</span>
-            <span className="font-display font-bold text-foreground">StudyCopilot</span>
+            <StudyCopilotLogo />
           </div>
           <button onClick={toggleTheme} className="w-9 h-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all ml-auto">
             {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import { StudyCopilotLogo } from './landing-page';
 
 interface PublicNavProps {
   currentPage?: string;
@@ -24,10 +25,7 @@ export function PublicNav({ currentPage, onViewFeatures, onViewPricing, onViewAb
     <nav className="bg-card/70 backdrop-blur-2xl border-b-2 border-primary/10 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-2xl">📚</span>
-          <span className="font-display text-lg font-bold gradient-text hidden sm:block">StudyCopilot</span>
-        </div>
+        <StudyCopilotLogo />
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8">

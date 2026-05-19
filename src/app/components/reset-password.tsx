@@ -3,6 +3,7 @@ import { Lock, Loader2, Moon, Sun } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { StudyCopilotLogo } from './landing-page';
 import { Label } from './ui/label';
 import { updatePassword } from '../lib/auth-service';
 import { toast } from 'sonner';
@@ -41,8 +42,7 @@ export function ResetPassword({ onSuccess, onCancel }: ResetPasswordProps) {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-between p-4 max-w-6xl mx-auto w-full">
         <div className="flex items-center gap-2.5">
-          <span className="text-2xl">📚</span>
-          <span className="font-display text-lg font-bold gradient-text">StudyCopilot</span>
+          <StudyCopilotLogo />
         </div>
         <button onClick={toggleTheme} className="w-9 h-9 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent transition-all">
           {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}

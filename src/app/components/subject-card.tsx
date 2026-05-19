@@ -89,8 +89,8 @@ export function SubjectCard({ title, units, completed, progress, badge, icon, co
                 <button className="bg-muted hover:bg-accent rounded-xl p-2 transition-all"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
-                <DropdownMenuItem onSelect={handleEdit}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleDelete} className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleEdit} onClick={(e) => e.stopPropagation()}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleDelete} onClick={(e) => e.stopPropagation()} className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -117,8 +117,8 @@ export function SubjectCard({ title, units, completed, progress, badge, icon, co
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl">
-              <DropdownMenuItem onSelect={handleEdit}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
-              <DropdownMenuItem onSelect={handleDelete} className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleEdit} onClick={(e) => e.stopPropagation()}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleDelete} onClick={(e) => e.stopPropagation()} className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="flex justify-center mt-4 text-5xl" style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15))' }}>

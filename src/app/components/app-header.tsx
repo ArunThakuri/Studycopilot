@@ -37,10 +37,7 @@ export function AppHeader({ user, onLogout, onOpenProfile, currentPage, onNaviga
           onClick={onNavigateHome}
           className="flex items-center gap-2 hover:opacity-80 transition-all btn-bounce text-foreground"
         >
-          <span className="text-2xl">📚</span>
-          <span className="font-display text-lg font-bold gradient-text hidden sm:block">
-            StudyCopilot
-          </span>
+          <StudyCopilotLogo />
         </button>
 
         {/* Right side */}

@@ -13,15 +13,15 @@ interface ModuleCardProps {
 }
 
 const colorStyles: Record<string, { bg: string; border: string; accent: string; glow: string }> = {
-  slate:  { bg: 'bg-card', border: 'border-border hover:border-slate-400/50', accent: 'bg-slate-100 text-slate-600', glow: 'hover:shadow-slate-200/50' },
-  indigo: { bg: 'bg-card', border: 'border-border hover:border-indigo-400/50', accent: 'bg-indigo-50 text-indigo-600', glow: 'hover:shadow-indigo-200/50' },
-  blue:   { bg: 'bg-card', border: 'border-border hover:border-blue-400/50', accent: 'bg-blue-50 text-blue-600', glow: 'hover:shadow-blue-200/50' },
-  green:  { bg: 'bg-card', border: 'border-border hover:border-primary/40', accent: 'bg-primary/10 text-primary', glow: 'hover:shadow-primary/20' },
-  purple: { bg: 'bg-card', border: 'border-border hover:border-purple-400/50', accent: 'bg-purple-50 text-purple-600', glow: 'hover:shadow-purple-200/50' },
-  orange: { bg: 'bg-card', border: 'border-border hover:border-orange-400/50', accent: 'bg-orange-50 text-orange-600', glow: 'hover:shadow-orange-200/50' },
-  pink:   { bg: 'bg-card', border: 'border-border hover:border-pink-400/50', accent: 'bg-pink-50 text-pink-600', glow: 'hover:shadow-pink-200/50' },
-  red:    { bg: 'bg-card', border: 'border-border hover:border-red-400/50', accent: 'bg-red-50 text-red-600', glow: 'hover:shadow-red-200/50' },
-  yellow: { bg: 'bg-card', border: 'border-border hover:border-amber-400/50', accent: 'bg-amber-50 text-amber-600', glow: 'hover:shadow-amber-200/50' },
+  slate:  { bg: 'bg-card', border: 'border-border hover:border-slate-400/50', accent: 'bg-slate-100 dark:bg-slate-900/40 text-slate-600 dark:text-slate-300', glow: 'hover:shadow-slate-200/50 dark:hover:shadow-slate-800/30' },
+  indigo: { bg: 'bg-card', border: 'border-border hover:border-indigo-400/50', accent: 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300', glow: 'hover:shadow-indigo-200/50 dark:hover:shadow-indigo-800/30' },
+  blue:   { bg: 'bg-card', border: 'border-border hover:border-blue-400/50', accent: 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300', glow: 'hover:shadow-blue-200/50 dark:hover:shadow-blue-800/30' },
+  green:  { bg: 'bg-card', border: 'border-border hover:border-primary/40', accent: 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary/80', glow: 'hover:shadow-primary/20 dark:hover:shadow-primary/30' },
+  purple: { bg: 'bg-card', border: 'border-border hover:border-purple-400/50', accent: 'bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300', glow: 'hover:shadow-purple-200/50 dark:hover:shadow-purple-800/30' },
+  orange: { bg: 'bg-card', border: 'border-border hover:border-orange-400/50', accent: 'bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-300', glow: 'hover:shadow-orange-200/50 dark:hover:shadow-orange-800/30' },
+  pink:   { bg: 'bg-card', border: 'border-border hover:border-pink-400/50', accent: 'bg-pink-50 dark:bg-pink-900/40 text-pink-600 dark:text-pink-300', glow: 'hover:shadow-pink-200/50 dark:hover:shadow-pink-800/30' },
+  red:    { bg: 'bg-card', border: 'border-border hover:border-red-400/50', accent: 'bg-red-50 dark:bg-red-900/40 text-red-600 dark:text-red-300', glow: 'hover:shadow-red-200/50 dark:hover:shadow-red-800/30' },
+  yellow: { bg: 'bg-card', border: 'border-border hover:border-amber-400/50', accent: 'bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300', glow: 'hover:shadow-amber-200/50 dark:hover:shadow-amber-800/30' },
 };
 
 export function ModuleCard({ icon, title, description, status, color, onClick, disabled, className }: ModuleCardProps) {
