@@ -1,0 +1,5 @@
+project_id = "ikdjvagyfcwccinstsex"
+
+[functions.make-server-eac874f3]
+enabled = true
+verify_jwt = false
