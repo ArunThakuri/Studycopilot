@@ -1156,59 +1156,65 @@ function App() {
     const useSequential = provider === 'openrouter';
     
     if (useSequential) {
-      console.log('⏱️ Processing modules SEQUENTIALLY to avoid rate limits...');
-      toast.info('Processing modules one at a time to avoid rate limits');
-      
-      // Process modules one at a time with delays
-      for (const module of modules) {
-        // Skip Coming Soon modules
-        if (module.name === 'audioLesson' || module.name === 'modelQuestion') {
-          handleUpdateModuleStatus(unitId, module.name, 'completed', module.name === 'audioLesson' ? '🎧 Coming Soon' : '📋 Coming Soon');
-          console.log(`⏭️ Skipped (Coming Soon): ${module.displayName}`);
-          continue;
-        }
+      console.log('⏱️ Processing modules in batches of 2 to avoid rate limits...');
+      toast.info('Processing modules in batches to avoid rate limits');
 
-        try {
-          console.log(`🚀 Processing: ${module.displayName}`);
-          handleUpdateModuleStatus(unitId, module.name, 'processing', undefined, undefined, 0);
+      // Process modules in batches of 2 (instead of fully sequential) for a ~2x speedup
+      // while still respecting rate limits.
+      const BATCH_SIZE = 2;
+      for (let i = 0; i < modules.length; i += BATCH_SIZE) {
+        const batch = modules.slice(i, i + BATCH_SIZE);
 
-          const data = await regenerateModule(
-            module.name,
-            markdown,
-            unitTitle,
-            (msg, progress) => {
-              handleUpdateModuleStatus(unitId, module.name, 'processing', undefined, undefined, progress);
-            }
-          );
-
-          handleUpdateModuleStatus(unitId, module.name, 'completed', data);
-          console.log(`✅ Completed: ${module.displayName}`);
-
-          // Add a small delay between modules to avoid rate limits
-          if (module.name !== 'practiceQuestions') { // Don't delay after last module
-            console.log('⏸️ Waiting 3 seconds before next module...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+        await Promise.all(batch.map(async (module) => {
+          // Skip Coming Soon modules
+          if (module.name === 'audioLesson' || module.name === 'modelQuestion') {
+            handleUpdateModuleStatus(unitId, module.name, 'completed', module.name === 'audioLesson' ? '🎧 Coming Soon' : '📋 Coming Soon');
+            console.log(`⏭️ Skipped (Coming Soon): ${module.displayName}`);
+            return;
           }
 
-        } catch (error: any) {
-          console.error(`❌ Error processing ${module.displayName}:`, error);
-          
-          // Check if it's a rate limit error
-          if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
-            toast.error(`Rate limit hit. Waiting 60 seconds before continuing...`);
-            await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
-            
-            // Retry this module
-            try {
-              const data = await regenerateModule(module.name, markdown, unitTitle);
-              handleUpdateModuleStatus(unitId, module.name, 'completed', data);
-              console.log(`✅ Completed (after retry): ${module.displayName}`);
-            } catch (retryError: any) {
-              handleUpdateModuleStatus(unitId, module.name, 'error', undefined, retryError.message || 'Processing failed');
+          try {
+            console.log(`🚀 Processing: ${module.displayName}`);
+            handleUpdateModuleStatus(unitId, module.name, 'processing', undefined, undefined, 0);
+
+            const data = await regenerateModule(
+              module.name,
+              markdown,
+              unitTitle,
+              (msg, progress) => {
+                handleUpdateModuleStatus(unitId, module.name, 'processing', undefined, undefined, progress);
+              }
+            );
+
+            handleUpdateModuleStatus(unitId, module.name, 'completed', data);
+            console.log(`✅ Completed: ${module.displayName}`);
+
+          } catch (error: any) {
+            console.error(`❌ Error processing ${module.displayName}:`, error);
+
+            // Check if it's a rate limit error
+            if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
+              toast.error(`Rate limit hit on ${module.displayName}. Will retry...`);
+              await new Promise(resolve => setTimeout(resolve, 60000)); // Wait 1 minute
+
+              // Retry this module
+              try {
+                const data = await regenerateModule(module.name, markdown, unitTitle);
+                handleUpdateModuleStatus(unitId, module.name, 'completed', data);
+                console.log(`✅ Completed (after retry): ${module.displayName}`);
+              } catch (retryError: any) {
+                handleUpdateModuleStatus(unitId, module.name, 'error', undefined, retryError.message || 'Processing failed');
+              }
+            } else {
+              handleUpdateModuleStatus(unitId, module.name, 'error', undefined, error.message || 'Processing failed');
             }
-          } else {
-            handleUpdateModuleStatus(unitId, module.name, 'error', undefined, error.message || 'Processing failed');
           }
+        }));
+
+        // Add a small delay between batches to avoid rate limits
+        if (i + BATCH_SIZE < modules.length) {
+          console.log('⏸️ Waiting 3 seconds before next batch...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
       }
     } else {

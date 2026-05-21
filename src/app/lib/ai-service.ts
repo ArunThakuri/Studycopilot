@@ -41,6 +41,27 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Run async tasks with limited concurrency, preserving order
+async function runWithConcurrency<T, R>(
+  items: T[],
+  processor: (item: T, index: number) => Promise<R>,
+  concurrency: number
+): Promise<R[]> {
+  const results: (R | null)[] = new Array(items.length).fill(null);
+  let index = 0;
+
+  async function worker(): Promise<void> {
+    while (index < items.length) {
+      const currentIndex = index++;
+      results[currentIndex] = await processor(items[currentIndex], currentIndex);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results as R[];
+}
+
 function getDirectHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (DIRECT_API_KEY) {
@@ -574,11 +595,12 @@ RULES - FOLLOW EXACTLY:
 ${pageNum === 1 ? `\nStart with: # ${unitTitle}\n` : `\nThis is page ${pageNum} of ${total}. Continue the transcription; do NOT repeat the title.\n`}
 Then transcribe the exact text from this image. Nothing more, nothing less.`;
 
-  const pages: string[] = [];
-  for (let i = 0; i < base64Images.length; i++) {
-    if (signal?.aborted) {
-      throw new Error('Processing cancelled');
-    }
+  // Process images with limited concurrency (3 at a time) to speed up extraction
+  // while avoiding rate limits and browser connection pool limits.
+  const MAX_CONCURRENT_IMAGES = 3;
+
+  const pages = await runWithConcurrency(base64Images, async (image, i) => {
+    if (signal?.aborted) throw new Error('Processing cancelled');
     onProgress?.(`Extracting text from page ${i + 1} of ${base64Images.length}...`);
     try {
       const text = await retryWithBackoff(
@@ -586,7 +608,7 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
           model: VISION_MODEL,
           temperature: 0.1,
           maxTokens: 16000,
-          images: [base64Images[i]],
+          images: [image],
           signal,
         }),
         `Image ${i + 1} text extraction`,
@@ -595,22 +617,21 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
       );
       if (text && text.trim().length > 0) {
         console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
-        pages.push(text.trim());
+        return text.trim();
       } else {
         console.warn(`⚠️ Page ${i + 1} returned empty text`);
+        return '';
       }
     } catch (error: any) {
       if (error.name === 'AbortError' || signal?.aborted || error.message === 'Processing cancelled') {
-        throw new Error('Processing cancelled');
+        throw error;
       }
       console.error(`Error extracting page ${i + 1}:`, error);
-      // Continue with remaining pages instead of failing the entire upload.
-      // Record a placeholder so the user knows which page failed.
-      pages.push(`\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`);
+      return `\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`;
     }
-  }
+  }, MAX_CONCURRENT_IMAGES);
 
-  const combined = pages.join('\n\n');
+  const combined = pages.filter(p => p.length > 0).join('\n\n');
   if (!combined || combined.trim().length === 0) throw new Error('AI returned empty response');
 
   console.log(`✅ Generated markdown: ${combined.length} chars from ${pages.length} pages`);
