@@ -646,7 +646,7 @@ Return ONLY a valid JSON array:
 [{ "word": "exact word from text", "definition": "clear explanation", "nepali": "Nepali translation" }]
 
 CONTENT:
-${markdown.substring(0, 3000)}
+${markdown}
 
 JSON Array:`;
 
@@ -670,7 +670,7 @@ export async function generateAudioTranscript(markdown: string, unitTitle: strin
   const prompt = `Create a concise 150-200 word summary for audio narration. Conversational tone, cover main concepts, use same language as content.
 
 Unit: ${unitTitle}
-Content: ${markdown.substring(0, 2500)}
+Content: ${markdown}
 AUDIO SUMMARY:`;
 
   try {
@@ -683,7 +683,6 @@ AUDIO SUMMARY:`;
 }
 
 export async function generateSummary(markdown: string): Promise<string> {
-  const content = markdown.substring(0, 4000);
   const prompt = `You are an expert study assistant. Read the following unit content and write a concise, well-structured summary.
 
 Rules:
@@ -693,7 +692,7 @@ Rules:
 - Do NOT repeat the entire text; focus on the most important points.
 
 CONTENT:
-${content}
+${markdown}
 
 SUMMARY (markdown formatted):`;
 
@@ -712,7 +711,6 @@ SUMMARY (markdown formatted):`;
 }
 
 export async function generateExercises(markdown: string): Promise<string> {
-  const content = markdown.substring(0, 6000);
   const prompt = `You are an expert tutor. Find every exercise, question, or problem in the following textbook content and provide a complete, step-by-step solution for each.
 
 Rules:
@@ -730,13 +728,13 @@ EXAMPLE FORMAT:
 **Answer:** 100°C
 
 CONTENT:
-${content}
+${markdown}
 
 ALL SOLVED EXERCISES:`;
 
   try {
     return await retryWithBackoff(async () => {
-      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 8192, model: OLLAMA_CONFIG.MODEL });
+      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 16000, model: OLLAMA_CONFIG.MODEL });
       text = text.trim();
       if (text.startsWith('```')) text = text.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
       if (!text || text.length < 50) throw new Error('Exercises response too short');
@@ -749,7 +747,6 @@ ALL SOLVED EXERCISES:`;
 }
 
 export async function generateQuiz(markdown: string): Promise<any[]> {
-  const content = markdown.substring(0, 4000);
   const prompt = `You are a quiz creator. Create exactly 10 multiple-choice questions based on the content below.
 
 CRITICAL: Your entire response must be ONE valid JSON array. Do NOT include markdown code blocks, explanations, or any text outside the JSON.
@@ -764,7 +761,7 @@ Required format for each question:
 }
 
 Content:
-${content}
+${markdown}
 
 JSON OUTPUT (array only):`;
 
@@ -792,7 +789,6 @@ JSON OUTPUT (array only):`;
 }
 
 export async function generatePracticeQuestions(markdown: string): Promise<any[]> {
-  const content = markdown.substring(0, 4000);
   const prompt = `You are an exam preparation assistant. Create 5-8 practice questions based on the content below.
 
 CRITICAL: Your entire response must be ONE valid JSON array. Do NOT include markdown code blocks, explanations, or any text outside the JSON.
@@ -806,7 +802,7 @@ Required format for each question:
 }
 
 Content:
-${content}
+${markdown}
 
 JSON OUTPUT (array only):`;
 
@@ -830,7 +826,7 @@ JSON OUTPUT (array only):`;
 export async function generateModelQuestion(markdown: string): Promise<string> {
   const prompt = `Create a model question paper. Include Time, Full Marks, Pass Marks. Sections: Group A (Very Short), B (Short), C (Long), D (Higher Ability). Format with Markdown.
 
-Content: ${markdown.substring(0, 3000)}
+Content: ${markdown}
 MODEL QUESTION PAPER:`;
 
   try {
@@ -844,7 +840,7 @@ MODEL QUESTION PAPER:`;
 export async function suggestTitleFromMarkdown(markdownContent: string, currentTitle?: string): Promise<string> {
   const prompt = `Suggest a short (3-7 word) title for this content. Just the title, nothing else.
 ${currentTitle ? `Current: ${currentTitle}` : ''}
-Content: ${markdownContent.substring(0, 2000)}
+Content: ${markdownContent}
 TITLE:`;
 
   try {
