@@ -595,43 +595,89 @@ RULES - FOLLOW EXACTLY:
 ${pageNum === 1 ? `\nStart with: # ${unitTitle}\n` : `\nThis is page ${pageNum} of ${total}. Continue the transcription; do NOT repeat the title.\n`}
 Then transcribe the exact text from this image. Nothing more, nothing less.`;
 
-  // Process images with limited concurrency (3 at a time) to speed up extraction
-  // while avoiding rate limits and browser connection pool limits.
-  const MAX_CONCURRENT_IMAGES = 3;
+  // Use parallel extraction ONLY for direct local Ollama where there's no proxy
+  // bottleneck. For Edge Function proxies, sequential avoids rate limits,
+  // server queuing, and retry storms that inflate token consumption.
+  const useParallel = DIRECT_VIABLE;
+  const MAX_CONCURRENT_IMAGES = useParallel ? 3 : 1;
 
-  const pages = await runWithConcurrency(base64Images, async (image, i) => {
-    if (signal?.aborted) throw new Error('Processing cancelled');
-    onProgress?.(`Extracting text from page ${i + 1} of ${base64Images.length}...`);
-    try {
-      const text = await retryWithBackoff(
-        () => unifiedGenerate(buildPrompt(i + 1, base64Images.length), {
-          model: VISION_MODEL,
-          temperature: 0.1,
-          maxTokens: 16000,
-          images: [image],
-          signal,
-        }),
-        `Image ${i + 1} text extraction`,
-        MAX_RETRIES,
-        signal
-      );
-      if (text && text.trim().length > 0) {
-        console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
-        return text.trim();
-      } else {
-        console.warn(`⚠️ Page ${i + 1} returned empty text`);
-        return '';
+  if (useParallel) {
+    console.log(`⚡ Processing ${base64Images.length} images in parallel (direct Ollama)`);
+  } else {
+    console.log(`⏱️ Processing ${base64Images.length} images sequentially (Edge Function proxy)`);
+  }
+
+  const pages: string[] = [];
+
+  if (MAX_CONCURRENT_IMAGES === 1) {
+    // Sequential path — preserves order, avoids rate limits
+    for (let i = 0; i < base64Images.length; i++) {
+      if (signal?.aborted) throw new Error('Processing cancelled');
+      onProgress?.(`Extracting text from page ${i + 1} of ${base64Images.length}...`);
+      try {
+        const text = await retryWithBackoff(
+          () => unifiedGenerate(buildPrompt(i + 1, base64Images.length), {
+            model: VISION_MODEL,
+            temperature: 0.1,
+            maxTokens: 16000,
+            images: [base64Images[i]],
+            signal,
+          }),
+          `Image ${i + 1} text extraction`,
+          MAX_RETRIES,
+          signal
+        );
+        if (text && text.trim().length > 0) {
+          console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
+          pages.push(text.trim());
+        } else {
+          console.warn(`⚠️ Page ${i + 1} returned empty text`);
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError' || signal?.aborted || error.message === 'Processing cancelled') {
+          throw new Error('Processing cancelled');
+        }
+        console.error(`Error extracting page ${i + 1}:`, error);
+        pages.push(`\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`);
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError' || signal?.aborted || error.message === 'Processing cancelled') {
-        throw error;
-      }
-      console.error(`Error extracting page ${i + 1}:`, error);
-      return `\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`;
     }
-  }, MAX_CONCURRENT_IMAGES);
+  } else {
+    // Parallel path — only for direct local Ollama
+    const parallelPages = await runWithConcurrency(base64Images, async (image, i) => {
+      if (signal?.aborted) throw new Error('Processing cancelled');
+      onProgress?.(`Extracting text from page ${i + 1} of ${base64Images.length}...`);
+      try {
+        const text = await retryWithBackoff(
+          () => unifiedGenerate(buildPrompt(i + 1, base64Images.length), {
+            model: VISION_MODEL,
+            temperature: 0.1,
+            maxTokens: 16000,
+            images: [image],
+            signal,
+          }),
+          `Image ${i + 1} text extraction`,
+          MAX_RETRIES,
+          signal
+        );
+        if (text && text.trim().length > 0) {
+          console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
+          return text.trim();
+        } else {
+          console.warn(`⚠️ Page ${i + 1} returned empty text`);
+          return '';
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError' || signal?.aborted || error.message === 'Processing cancelled') {
+          throw error;
+        }
+        console.error(`Error extracting page ${i + 1}:`, error);
+        return `\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`;
+      }
+    }, MAX_CONCURRENT_IMAGES);
+    pages.push(...parallelPages);
+  }
 
-  const combined = pages.filter(p => p.length > 0).join('\n\n');
+  const combined = pages.filter(p => p && p.length > 0).join('\n\n');
   if (!combined || combined.trim().length === 0) throw new Error('AI returned empty response');
 
   console.log(`✅ Generated markdown: ${combined.length} chars from ${pages.length} pages`);
