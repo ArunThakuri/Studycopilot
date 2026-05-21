@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { getAIStatus, listAvailableModels, setAIModel, getAIModel } from '../lib/ai-service';
+import { getAIStatus, listAvailableModels, setAIModel, getAIModel, setVisionModel, getVisionModel } from '../lib/ai-service';
 import { toast } from 'sonner';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getAccessToken } from '../lib/auth-service';
@@ -39,6 +39,7 @@ interface RealUser {
 
 export function AdminPanel({ onBack }: AdminPanelProps) {
   const [selectedModel, setSelectedModel] = useState(getAIModel());
+  const [selectedVisionModel, setSelectedVisionModel] = useState(getVisionModel());
   const [aiStatus, setAiStatus] = useState<{ available: boolean; message: string } | null>(null);
   const [discoveringModels, setDiscoveringModels] = useState(false);
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
@@ -99,7 +100,8 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
 
   const handleSaveModel = () => {
     setAIModel(selectedModel);
-    toast.success(`AI model set to: ${selectedModel}`);
+    setVisionModel(selectedVisionModel);
+    toast.success(`Text model: ${selectedModel} · Vision model: ${selectedVisionModel}`);
     checkStatus();
   };
 
@@ -116,7 +118,9 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   };
 
   const defaultModels = [
-    { id: 'kimi-k2.6', name: 'Kimi 2.6 (text — Recommended)' },
+    { id: 'deepseek-v4-flash:cloud', name: 'DeepSeek V4 Flash (text — Recommended)' },
+    { id: 'kimi-k2.6', name: 'Kimi 2.6 (text)' },
+    { id: 'gemma4', name: 'Gemma 4 (vision)' },
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (vision)' },
     { id: 'gemma3:27b', name: 'Gemma 3 27B (vision)' },
     { id: 'qwen3-vl:235b-instruct', name: 'Qwen3-VL 235B (vision)' },
@@ -212,7 +216,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ai-model" className="text-foreground font-bold">AI Model</Label>
+                    <Label htmlFor="ai-model" className="text-foreground font-bold">Text Generation Model</Label>
                     <Select value={selectedModel} onValueChange={setSelectedModel}>
                       <SelectTrigger id="ai-model" className="bg-input-background border-2 border-border rounded-xl"><SelectValue /></SelectTrigger>
                       <SelectContent className="bg-card border-2 border-border rounded-xl">
@@ -221,7 +225,20 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground font-semibold">Kimi 2.6 is recommended for best results with text and vision tasks.</p>
+                    <p className="text-xs text-muted-foreground font-semibold">Used for vocabulary, summary, exercises, quiz, and all learning modules.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-vision-model" className="text-foreground font-bold">Vision / Image Model</Label>
+                    <Select value={selectedVisionModel} onValueChange={setSelectedVisionModel}>
+                      <SelectTrigger id="ai-vision-model" className="bg-input-background border-2 border-border rounded-xl"><SelectValue /></SelectTrigger>
+                      <SelectContent className="bg-card border-2 border-border rounded-xl">
+                        {modelsToShow.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>{model.name || model.id}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground font-semibold">Used for extracting text from uploaded textbook images.</p>
                   </div>
                 </CardContent>
                 <CardFooter className="flex gap-2 flex-wrap">

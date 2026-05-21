@@ -9,6 +9,7 @@ import { Progress } from './ui/progress';
 import { Subject, User } from '../App';
 import { Unit } from './units-dashboard';
 import { processUnitQuickly, getAIProviderStatus, suggestTitleFromMarkdown, createInitialContentStructure } from '../lib/ai-provider';
+import { getVisionModel } from '../lib/ai-service';
 import { saveUnitImages } from '../lib/unit-images-store';
 import { fileToDataUrl } from '../lib/ai-service';
 import { AppHeader } from './app-header';
@@ -279,7 +280,7 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
                       ? 'bg-primary/10 text-primary border-primary/20' 
                       : 'bg-muted text-muted-foreground border-border'
                   }`}>
-                    Using Ollama AI (Kimi 2.6)
+                    Using {getVisionModel()} for images
                   </span>
                 )}
               </div>

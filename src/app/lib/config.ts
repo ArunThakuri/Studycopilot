@@ -11,8 +11,8 @@ export const OLLAMA_CONFIG = {
   SERVER_URL: (import.meta.env.VITE_OLLAMA_SERVER_URL || 'http://localhost:11434').replace(/\/$/, ''),
   API_KEY: import.meta.env.VITE_OLLAMA_API_KEY || '',
   USE_DIRECT: import.meta.env.VITE_USE_DIRECT_OLLAMA !== 'false',
-  MODEL: 'kimi-k2.6:cloud',
-  VISION_MODEL: 'kimi-k2.6:cloud',
+  MODEL: 'deepseek-v4-flash:cloud',
+  VISION_MODEL: 'gemma4',
 };
 
 export const AI_CONFIG = {

@@ -12,7 +12,7 @@ const DIRECT_API_KEY = OLLAMA_CONFIG.API_KEY;
 const EDGE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-eac874f3`;
 
 let AI_MODEL = OLLAMA_CONFIG.MODEL;
-const VISION_MODEL = OLLAMA_CONFIG.VISION_MODEL;
+let VISION_MODEL = OLLAMA_CONFIG.VISION_MODEL;
 
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY = 2000;
@@ -34,6 +34,11 @@ if (typeof window !== 'undefined') {
   if (savedModel) {
     AI_MODEL = savedModel;
     console.log('Loaded saved AI model:', AI_MODEL);
+  }
+  const savedVisionModel = localStorage.getItem('ai_vision_model');
+  if (savedVisionModel) {
+    VISION_MODEL = savedVisionModel;
+    console.log('Loaded saved vision model:', VISION_MODEL);
   }
 }
 
@@ -402,6 +407,14 @@ export function setAIModel(model: string) {
 }
 
 export function getAIModel(): string { return AI_MODEL; }
+
+export function setVisionModel(model: string) {
+  VISION_MODEL = model;
+  if (typeof window !== 'undefined') localStorage.setItem('ai_vision_model', model);
+  console.log('Vision model set to:', model);
+}
+
+export function getVisionModel(): string { return VISION_MODEL; }
 
 export function isAIConfigured(): boolean { return true; }
 

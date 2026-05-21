@@ -82,7 +82,7 @@ function getAuthHeaders(c?: any): Record<string, string> {
   return headers;
 }
 
-const DEFAULT_MODEL = 'kimi-k2.6:cloud';
+const DEFAULT_MODEL = 'deepseek-v4-flash:cloud';
 
 async function callOllama(
   prompt: string,
