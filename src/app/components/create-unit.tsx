@@ -111,8 +111,9 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
       imageCount: uploadedImages.length,
     };
 
-    // Convert uploaded images to data URLs and persist them
-    if (uploadedImages.length > 0) {
+    // Only persist uploaded images for admin users to avoid localStorage bloat.
+    // Non-admin users still get text extraction; images are discarded after processing.
+    if (uploadedImages.length > 0 && user?.isAdmin) {
       try {
         const imageDataUrls = await Promise.all(uploadedImages.map(file => fileToDataUrl(file)));
         saveUnitImages(newUnit.id, imageDataUrls);

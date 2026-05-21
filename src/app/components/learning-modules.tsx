@@ -98,7 +98,6 @@ export function LearningModules({ subject, unit, user, onBack, onOpenModule, onR
   };
 
   const modules = [
-    { icon: '📄', title: 'Source Markdown', moduleName: 'markdown', description: 'View and edit the structured content source', color: 'slate' as const, canRegenerate: false },
     { icon: '📚', title: 'Unit Text', moduleName: 'unitText', description: 'Read the complete unit content with audio support', color: 'indigo' as const, canRegenerate: false },
     { icon: '🎧', title: 'Audio Lesson', moduleName: 'audioLesson', description: 'Listen to AI-generated audio for every unit', color: 'blue' as const, canRegenerate: true },
     { icon: '📗', title: 'Vocabulary', moduleName: 'vocabulary', description: 'Learn difficult words with Nepali translations', color: 'green' as const, canRegenerate: true },
@@ -109,8 +108,14 @@ export function LearningModules({ subject, unit, user, onBack, onOpenModule, onR
     { icon: '📋', title: 'Model Question', moduleName: 'modelQuestion', description: 'Exam-style practice paper with mark distribution', color: 'yellow' as const, canRegenerate: true },
   ];
 
-  const totalModules = modules.length;
-  const completedModules = modules.filter(m => canOpenModule(m.moduleName)).length;
+  // Admin-only modules
+  const adminModules = [
+    { icon: '📄', title: 'Source Markdown', moduleName: 'markdown', description: 'View and edit the structured content source', color: 'slate' as const, canRegenerate: false },
+  ];
+
+  const visibleModules = user?.isAdmin ? [...adminModules, ...modules] : modules;
+  const totalModules = visibleModules.length;
+  const completedModules = visibleModules.filter(m => canOpenModule(m.moduleName)).length;
   const overallProgress = Math.round((completedModules / totalModules) * 100);
   const markdownContent = unit.content?.markdown?.data || unit.content?.markdown || '';
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -191,7 +196,7 @@ export function LearningModules({ subject, unit, user, onBack, onOpenModule, onR
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {modules.map((module, idx) => {
+            {visibleModules.map((module, idx) => {
               const status = getModuleStatus(module.moduleName);
               const canOpen = canOpenModule(module.moduleName);
               const isProcessing = isModuleProcessing(module.moduleName);
@@ -248,13 +253,13 @@ export function LearningModules({ subject, unit, user, onBack, onOpenModule, onR
               );
             })}
 
-            {/* Unit Images Card */}
-            {hasUnitImages(unit.id) && (
+            {/* Unit Images Card — admin only */}
+            {user?.isAdmin && hasUnitImages(unit.id) && (
               <motion.div
                 key="Unit Images"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: modules.length * 0.05 }}
+                transition={{ delay: visibleModules.length * 0.05 }}
                 className="relative"
               >
                 <ModuleCard
