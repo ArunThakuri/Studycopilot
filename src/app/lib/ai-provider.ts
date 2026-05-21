@@ -39,11 +39,14 @@ export async function processUnitQuickly(
   images: File[],
   unitTitle: string,
   markdownContent?: string,
-  onProgress?: (step: string, progress: number) => void
+  onProgress?: (step: string, progress: number) => void,
+  signal?: AbortSignal
 ): Promise<{
   markdown: string;
   unitText: string;
 }> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
+
   if (markdownContent && markdownContent.trim().length > 0) {
     console.log('Markdown file provided - Processing...');
     onProgress?.('Processing your markdown file...', 30);
@@ -54,9 +57,11 @@ export async function processUnitQuickly(
       onProgress?.('Cleaning with AI...', 60);
       processedMarkdown = await AIService.cleanAndStructureText(
         markdownContent,
-        (msg) => onProgress?.(msg, 80)
+        (msg) => onProgress?.(msg, 80),
+        signal
       );
     } catch (error) {
+      if (signal?.aborted || (error as Error).message === 'Processing cancelled') throw error;
       console.error('Could not clean text:', error);
     }
 
@@ -78,7 +83,8 @@ export async function processUnitQuickly(
       const extractedMarkdown = await AIService.generateMarkdownFromImages(
         images,
         unitTitle,
-        (step) => onProgress?.(step, 60)
+        (step) => onProgress?.(step, 60),
+        signal
       );
 
       console.log('Text extracted successfully!');
@@ -89,10 +95,12 @@ export async function processUnitQuickly(
         onProgress?.('Cleaning and structuring text...', 80);
         processedMarkdown = await AIService.cleanAndStructureText(
           extractedMarkdown,
-          (msg) => onProgress?.(msg, 90)
+          (msg) => onProgress?.(msg, 90),
+          signal
         );
         console.log('Text cleaned and structured!');
       } catch (error) {
+        if (signal?.aborted || (error as Error).message === 'Processing cancelled') throw error;
         console.error('Could not clean text, using extracted version:', error);
       }
 
@@ -106,7 +114,7 @@ export async function processUnitQuickly(
       };
     } catch (error) {
       console.error('Error extracting text:', error);
-      throw new Error('Failed to extract text from images');
+      throw error;
     }
   }
 
@@ -130,8 +138,10 @@ export async function processModuleAsync(
   moduleName: ModuleName,
   markdown: string,
   unitTitle: string,
-  onProgress?: (message: string, progress: number) => void
+  onProgress?: (message: string, progress: number) => void,
+  signal?: AbortSignal
 ): Promise<any> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   console.log(`Processing module: ${moduleName}`);
 
   try {
@@ -140,7 +150,7 @@ export async function processModuleAsync(
     switch (moduleName) {
       case 'vocabulary':
         onProgress?.('Extracting vocabulary...', 30);
-        result = await AIService.generateVocabulary(markdown);
+        result = await AIService.generateVocabulary(markdown, signal);
         break;
 
       case 'audioLesson':
@@ -151,27 +161,27 @@ export async function processModuleAsync(
 
       case 'summary':
         onProgress?.('Creating summary...', 30);
-        result = await AIService.generateSummary(markdown);
+        result = await AIService.generateSummary(markdown, signal);
         break;
 
       case 'exercises':
         onProgress?.('Generating exercises...', 30);
-        result = await AIService.generateExercises(markdown);
+        result = await AIService.generateExercises(markdown, signal);
         break;
 
       case 'interactiveQuiz':
         onProgress?.('Creating quiz...', 30);
-        result = await AIService.generateQuiz(markdown);
+        result = await AIService.generateQuiz(markdown, signal);
         break;
 
       case 'practiceQuestions':
         onProgress?.('Generating practice questions...', 30);
-        result = await AIService.generatePracticeQuestions(markdown);
+        result = await AIService.generatePracticeQuestions(markdown, signal);
         break;
 
       case 'modelQuestion':
         onProgress?.('Creating model question paper...', 30);
-        result = await AIService.generateModelQuestion(markdown);
+        result = await AIService.generateModelQuestion(markdown, signal);
         break;
 
       default:
@@ -190,17 +200,19 @@ export async function regenerateModule(
   moduleName: ModuleName,
   markdown: string,
   unitTitle: string,
-  onProgress?: (message: string, progress: number) => void
+  onProgress?: (message: string, progress: number) => void,
+  signal?: AbortSignal
 ): Promise<any> {
-  return await processModuleAsync(moduleName, markdown, unitTitle, onProgress);
+  return await processModuleAsync(moduleName, markdown, unitTitle, onProgress, signal);
 }
 
 export async function suggestTitleFromMarkdown(
   markdownContent: string,
-  currentTitle?: string
+  currentTitle?: string,
+  signal?: AbortSignal
 ): Promise<string> {
   try {
-    return await AIService.suggestTitleFromMarkdown(markdownContent, currentTitle);
+    return await AIService.suggestTitleFromMarkdown(markdownContent, currentTitle, signal);
   } catch (error) {
     console.error('Error suggesting title:', error);
     return '';

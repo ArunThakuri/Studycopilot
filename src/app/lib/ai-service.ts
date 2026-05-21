@@ -63,8 +63,10 @@ function getEdgeHeaders(): Record<string, string> {
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   operation: string = 'API call',
-  maxRetries: number = MAX_RETRIES
+  maxRetries: number = MAX_RETRIES,
+  signal?: AbortSignal
 ): Promise<T> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -72,6 +74,7 @@ async function retryWithBackoff<T>(
       return await fn();
     } catch (error: any) {
       lastError = error;
+      if (error.name === 'AbortError' || signal?.aborted) throw error;
       console.error(`${operation} - Attempt ${attempt + 1} failed:`, error.message);
       if (attempt === maxRetries) throw error;
       const delayMs = INITIAL_RETRY_DELAY * Math.pow(2, attempt);
@@ -120,6 +123,7 @@ async function directGenerate(
     temperature?: number;
     maxTokens?: number;
     images?: string[];
+    signal?: AbortSignal;
   } = {}
 ): Promise<string> {
   const body: any = {
@@ -142,29 +146,35 @@ async function directGenerate(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for direct Ollama
+  const signal = options.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
 
-  const response = await fetch(`${DIRECT_URL}/api/generate`, {
-    method: 'POST',
-    headers: getDirectHeaders(),
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
-  clearTimeout(timeoutId);
+  try {
+    const response = await fetch(`${DIRECT_URL}/api/generate`, {
+      method: 'POST',
+      headers: getDirectHeaders(),
+      body: JSON.stringify(body),
+      signal,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => `Ollama error ${response.status}`);
-    throw new Error(`Ollama API error (${response.status}): ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Ollama error ${response.status}`);
+      throw new Error(`Ollama API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.response;
+
+    if (!content) {
+      console.error('[OLLAMA DIRECT] Empty response:', JSON.stringify(data));
+      throw new Error('Ollama returned an empty response');
+    }
+
+    return content;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json();
-  const content = data.response;
-
-  if (!content) {
-    console.error('[OLLAMA DIRECT] Empty response:', JSON.stringify(data));
-    throw new Error('Ollama returned an empty response');
-  }
-
-  return content;
 }
 
 async function directChat(
@@ -173,6 +183,7 @@ async function directChat(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    signal?: AbortSignal;
   } = {}
 ): Promise<string> {
   const body: any = {
@@ -188,29 +199,35 @@ async function directChat(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 120000);
+  const signal = options.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
 
-  const response = await fetch(`${DIRECT_URL}/api/chat`, {
-    method: 'POST',
-    headers: getDirectHeaders(),
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
-  clearTimeout(timeoutId);
+  try {
+    const response = await fetch(`${DIRECT_URL}/api/chat`, {
+      method: 'POST',
+      headers: getDirectHeaders(),
+      body: JSON.stringify(body),
+      signal,
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => `Ollama chat error ${response.status}`);
-    throw new Error(`Ollama chat error (${response.status}): ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => `Ollama chat error ${response.status}`);
+      throw new Error(`Ollama chat error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.message?.content;
+
+    if (!content) {
+      console.error('[OLLAMA DIRECT CHAT] Empty response:', JSON.stringify(data));
+      throw new Error('Ollama returned an empty response');
+    }
+
+    return content;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json();
-  const content = data.message?.content;
-
-  if (!content) {
-    console.error('[OLLAMA DIRECT CHAT] Empty response:', JSON.stringify(data));
-    throw new Error('Ollama returned an empty response');
-  }
-
-  return content;
 }
 
 // ============================================
@@ -225,45 +242,54 @@ async function serverGenerate(
     temperature?: number;
     maxTokens?: number;
     images?: string[];
+    signal?: AbortSignal;
   } = {}
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 150000); // 150s timeout for Edge Function
+  const signal = options.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
 
-  const response = await fetch(`${EDGE_URL}/ai/generate`, {
-    method: 'POST',
-    headers: getEdgeHeaders(),
-    body: JSON.stringify({
-      prompt,
-      systemPrompt: options.systemPrompt,
-      model: options.model || AI_MODEL,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-      images: options.images,
-    }),
-    signal: controller.signal,
-  });
-  clearTimeout(timeoutId);
+  try {
+    const response = await fetch(`${EDGE_URL}/ai/generate`, {
+      method: 'POST',
+      headers: getEdgeHeaders(),
+      body: JSON.stringify({
+        prompt,
+        systemPrompt: options.systemPrompt,
+        model: options.model || AI_MODEL,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        images: options.images,
+      }),
+      signal,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: `Server error ${response.status}` }));
-    throw new Error(errorData.error || `AI request failed (${response.status})`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: `Server error ${response.status}` }));
+      throw new Error(errorData.error || `AI request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    return data.result;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json();
-  return data.result;
 }
 
 async function serverChat(
   question: string,
   context: string,
   unitTitle: string,
-  conversationHistory?: Array<{ role: string; content: string }>
+  conversationHistory?: Array<{ role: string; content: string }>,
+  signal?: AbortSignal
 ): Promise<string> {
   const response = await fetch(`${EDGE_URL}/ai/chat`, {
     method: 'POST',
     headers: getEdgeHeaders(),
     body: JSON.stringify({ question, context, unitTitle, model: AI_MODEL, conversationHistory }),
+    signal,
   });
 
   if (!response.ok) {
@@ -286,12 +312,14 @@ async function unifiedGenerate(
     temperature?: number;
     maxTokens?: number;
     images?: string[];
+    signal?: AbortSignal;
   } = {}
 ): Promise<string> {
   if (DIRECT_VIABLE) {
     try {
       return await directGenerate(prompt, options);
     } catch (error: any) {
+      if (error.name === 'AbortError') throw error;
       console.warn('[AI] Direct Ollama failed. Falling back to Supabase Edge Function...');
       return await serverGenerate(prompt, options);
     }
@@ -303,7 +331,8 @@ async function unifiedChat(
   question: string,
   context: string,
   unitTitle: string,
-  conversationHistory?: Array<{ role: string; content: string }>
+  conversationHistory?: Array<{ role: string; content: string }>,
+  signal?: AbortSignal
 ): Promise<string> {
   if (DIRECT_VIABLE) {
     const systemPrompt = `You are a helpful AI study assistant. You are helping a student understand content from their textbook unit titled "${unitTitle}".
@@ -331,13 +360,14 @@ Instructions:
     messages.push({ role: 'user', content: question });
 
     try {
-      return await directChat(messages, { model: AI_MODEL, temperature: 0.7, maxTokens: 1500 });
+      return await directChat(messages, { model: AI_MODEL, temperature: 0.7, maxTokens: 1500, signal });
     } catch (error: any) {
+      if (error.name === 'AbortError') throw error;
       console.warn('[AI] Direct Ollama chat failed. Falling back to Supabase Edge Function...');
-      return await serverChat(question, context, unitTitle, conversationHistory);
+      return await serverChat(question, context, unitTitle, conversationHistory, signal);
     }
   }
-  return await serverChat(question, context, unitTitle, conversationHistory);
+  return await serverChat(question, context, unitTitle, conversationHistory, signal);
 }
 
 // ============================================
@@ -500,7 +530,8 @@ function resizeImage(file: File, maxWidth = 1600, quality = 0.85): Promise<strin
 export async function generateMarkdownFromImages(
   images: File[],
   unitTitle: string,
-  onProgress?: (step: string) => void
+  onProgress?: (step: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   if (images.length === 0) throw new Error('No images provided');
 
@@ -545,6 +576,9 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
 
   const pages: string[] = [];
   for (let i = 0; i < base64Images.length; i++) {
+    if (signal?.aborted) {
+      throw new Error('Processing cancelled');
+    }
     onProgress?.(`Extracting text from page ${i + 1} of ${base64Images.length}...`);
     try {
       const text = await retryWithBackoff(
@@ -553,8 +587,11 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
           temperature: 0.1,
           maxTokens: 16000,
           images: [base64Images[i]],
+          signal,
         }),
-        `Image ${i + 1} text extraction`
+        `Image ${i + 1} text extraction`,
+        MAX_RETRIES,
+        signal
       );
       if (text && text.trim().length > 0) {
         console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
@@ -563,6 +600,9 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
         console.warn(`⚠️ Page ${i + 1} returned empty text`);
       }
     } catch (error: any) {
+      if (error.name === 'AbortError' || signal?.aborted || error.message === 'Processing cancelled') {
+        throw new Error('Processing cancelled');
+      }
       console.error(`Error extracting page ${i + 1}:`, error);
       // Continue with remaining pages instead of failing the entire upload.
       // Record a placeholder so the user knows which page failed.
@@ -582,12 +622,15 @@ export async function generateChatResponse(
   question: string,
   context: string,
   unitTitle: string,
-  conversationHistory?: Array<{ role: string; content: string }>
+  conversationHistory?: Array<{ role: string; content: string }>,
+  signal?: AbortSignal
 ): Promise<string> {
   try {
     return await retryWithBackoff(
-      () => unifiedChat(question, context, unitTitle, conversationHistory),
-      'Chat response'
+      () => unifiedChat(question, context, unitTitle, conversationHistory, signal),
+      'Chat response',
+      MAX_RETRIES,
+      signal
     );
   } catch (error: any) {
     console.error('[AI CHAT] Error:', error);
@@ -597,8 +640,10 @@ export async function generateChatResponse(
 
 export async function cleanAndStructureText(
   markdown: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   onProgress?.('Formatting and structuring full content...');
 
   // For long documents, skip the AI cleaning step entirely.
@@ -626,7 +671,7 @@ ${markdown}
 STRUCTURED COMPLETE CONTENT:`;
 
   try {
-    let cleanedText = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 8192, model: OLLAMA_CONFIG.MODEL });
+    let cleanedText = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 8192, model: OLLAMA_CONFIG.MODEL, signal });
     cleanedText = cleanedText.trim();
     if (cleanedText.startsWith('```')) {
       cleanedText = cleanedText.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
@@ -651,11 +696,12 @@ STRUCTURED COMPLETE CONTENT:`;
   }
 }
 
-export async function generateVocabulary(markdown: string): Promise<Array<{
+export async function generateVocabulary(markdown: string, signal?: AbortSignal): Promise<Array<{
   word: string;
   nepali: string;
   definition: string;
 }>> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `Extract 8-12 DIFFICULT or ACADEMIC vocabulary words from this content.
 Return ONLY a valid JSON array:
 [{ "word": "exact word from text", "definition": "clear explanation", "nepali": "Nepali translation" }]
@@ -667,12 +713,13 @@ JSON Array:`;
 
   try {
     return await retryWithBackoff(async () => {
-      const text = await unifiedGenerate(prompt, { temperature: 0.3, model: OLLAMA_CONFIG.MODEL });
+      const text = await unifiedGenerate(prompt, { temperature: 0.3, model: OLLAMA_CONFIG.MODEL, signal });
       const vocab = extractJSON(text);
       if (Array.isArray(vocab) && vocab.length > 0) { console.log(`Generated ${vocab.length} vocabulary words`); return vocab; }
       throw new Error('No vocabulary parsed');
-    }, 'Vocabulary generation');
+    }, 'Vocabulary generation', MAX_RETRIES, signal);
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     console.error('Error generating vocabulary:', error);
     return [
       { word: "Analysis", definition: "The detailed examination of something", nepali: "विश्लेषण" },
@@ -681,7 +728,8 @@ JSON Array:`;
   }
 }
 
-export async function generateAudioTranscript(markdown: string, unitTitle: string): Promise<string> {
+export async function generateAudioTranscript(markdown: string, unitTitle: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `Create a concise 150-200 word summary for audio narration. Conversational tone, cover main concepts, use same language as content.
 
 Unit: ${unitTitle}
@@ -689,15 +737,17 @@ Content: ${markdown}
 AUDIO SUMMARY:`;
 
   try {
-    const text = await unifiedGenerate(prompt, { temperature: 0.7, model: OLLAMA_CONFIG.MODEL });
+    const text = await unifiedGenerate(prompt, { temperature: 0.7, model: OLLAMA_CONFIG.MODEL, signal });
     if (text.length < 50) throw new Error('Response too short');
     return text.trim();
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     return `Welcome to ${unitTitle}. In this lesson, we'll explore the fundamental concepts and practical applications.`;
   }
 }
 
-export async function generateSummary(markdown: string): Promise<string> {
+export async function generateSummary(markdown: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `You are an expert study assistant. Read the following unit content and write a concise, well-structured summary.
 
 Rules:
@@ -713,19 +763,21 @@ SUMMARY (markdown formatted):`;
 
   try {
     return await retryWithBackoff(async () => {
-      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL });
+      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL, signal });
       text = text.trim();
       if (text.startsWith('```')) text = text.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
       if (!text || text.length < 20) throw new Error('Summary too short or empty');
       return text;
-    }, 'Summary generation');
+    }, 'Summary generation', MAX_RETRIES, signal);
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     console.error('Summary generation failed:', error);
     return '**Key Concepts**: Unable to generate summary. Please try again.';
   }
 }
 
-export async function generateExercises(markdown: string): Promise<string> {
+export async function generateExercises(markdown: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `You are an expert tutor. Find EVERY exercise, question, or problem in the following textbook content and provide a complete, step-by-step solution for each.
 
 OUTPUT RULES — FOLLOW EXACTLY:
@@ -763,19 +815,21 @@ ALL SOLVED EXERCISES:`;
 
   try {
     return await retryWithBackoff(async () => {
-      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 16000, model: OLLAMA_CONFIG.MODEL });
+      let text = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 16000, model: OLLAMA_CONFIG.MODEL, signal });
       text = text.trim();
       if (text.startsWith('```')) text = text.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
       if (!text || text.length < 50) throw new Error('Exercises response too short');
       return text;
-    }, 'Exercises generation');
+    }, 'Exercises generation', MAX_RETRIES, signal);
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     console.error('Exercises generation failed:', error);
     return '## No Exercises Found\n\nUnable to extract exercises from this content.';
   }
 }
 
-export async function generateQuiz(markdown: string): Promise<any[]> {
+export async function generateQuiz(markdown: string, signal?: AbortSignal): Promise<any[]> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `You are a quiz creator. Create exactly 10 multiple-choice questions based on the content below.
 
 CRITICAL: Your entire response must be ONE valid JSON array. Do NOT include markdown code blocks, explanations, or any text outside the JSON.
@@ -796,7 +850,7 @@ JSON OUTPUT (array only):`;
 
   try {
     return await retryWithBackoff(async () => {
-      const text = await unifiedGenerate(prompt, { temperature: 0.2, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL });
+      const text = await unifiedGenerate(prompt, { temperature: 0.2, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL, signal });
       console.log('[QUIZ] raw response:', text.substring(0, 300));
       const quiz = extractJSON(text);
       if (Array.isArray(quiz) && quiz.length > 0) {
@@ -810,14 +864,16 @@ JSON OUTPUT (array only):`;
         if (valid.length > 0) return valid;
       }
       throw new Error('Failed to parse quiz');
-    }, 'Quiz generation');
+    }, 'Quiz generation', MAX_RETRIES, signal);
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     console.error('Quiz generation failed:', error);
     return [];
   }
 }
 
-export async function generatePracticeQuestions(markdown: string): Promise<any[]> {
+export async function generatePracticeQuestions(markdown: string, signal?: AbortSignal): Promise<any[]> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `You are an exam preparation assistant. Create 5-8 practice questions based on the content below.
 
 CRITICAL: Your entire response must be ONE valid JSON array. Do NOT include markdown code blocks, explanations, or any text outside the JSON.
@@ -837,7 +893,7 @@ JSON OUTPUT (array only):`;
 
   try {
     return await retryWithBackoff(async () => {
-      const text = await unifiedGenerate(prompt, { temperature: 0.2, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL });
+      const text = await unifiedGenerate(prompt, { temperature: 0.2, maxTokens: 4096, model: OLLAMA_CONFIG.MODEL, signal });
       console.log('[PRACTICE] raw response:', text.substring(0, 300));
       const practice = extractJSON(text);
       if (Array.isArray(practice) && practice.length > 0) {
@@ -845,42 +901,52 @@ JSON OUTPUT (array only):`;
         if (valid.length > 0) return valid;
       }
       throw new Error('Failed to parse practice questions');
-    }, 'Practice questions');
+    }, 'Practice questions', MAX_RETRIES, signal);
   } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
     console.error('Practice questions generation failed:', error);
     return [];
   }
 }
 
-export async function generateModelQuestion(markdown: string): Promise<string> {
+export async function generateModelQuestion(markdown: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `Create a model question paper. Include Time, Full Marks, Pass Marks. Sections: Group A (Very Short), B (Short), C (Long), D (Higher Ability). Format with Markdown.
 
 Content: ${markdown}
 MODEL QUESTION PAPER:`;
 
   try {
-    let text = await unifiedGenerate(prompt, { temperature: 0.6, model: OLLAMA_CONFIG.MODEL });
+    let text = await unifiedGenerate(prompt, { temperature: 0.6, model: OLLAMA_CONFIG.MODEL, signal });
     text = text.trim();
     if (text.startsWith('```')) text = text.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
     return text;
-  } catch (error: any) { return '# Model Question Paper\n\nUnable to generate.'; }
+  } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
+    return '# Model Question Paper\n\nUnable to generate.';
+  }
 }
 
-export async function suggestTitleFromMarkdown(markdownContent: string, currentTitle?: string): Promise<string> {
+export async function suggestTitleFromMarkdown(markdownContent: string, currentTitle?: string, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `Suggest a short (3-7 word) title for this content. Just the title, nothing else.
 ${currentTitle ? `Current: ${currentTitle}` : ''}
 Content: ${markdownContent}
 TITLE:`;
 
   try {
-    let title = await unifiedGenerate(prompt, { temperature: 0.5, model: OLLAMA_CONFIG.MODEL });
+    let title = await unifiedGenerate(prompt, { temperature: 0.5, model: OLLAMA_CONFIG.MODEL, signal });
     return title.trim().replace(/^["']|["']$/g, '');
-  } catch (error: any) { return ''; }
+  } catch (error: any) {
+    if (signal?.aborted || error.message === 'Processing cancelled') throw error;
+    return '';
+  }
 }
 
-export async function lookupVocabulary(word: string, context: string): Promise<{
+export async function lookupVocabulary(word: string, context: string, signal?: AbortSignal): Promise<{
   word: string; definition: string; nepali: string; examples?: string[];
 }> {
+  if (signal?.aborted) throw new Error('Processing cancelled');
   const prompt = `You are a vocabulary assistant. Your ONLY output must be a single valid JSON object — no markdown, no explanations, no preamble.
 
 Define the word "${word}"${context ? ` using this context:\n${context.substring(0, 1000)}` : '.'}
@@ -890,8 +956,10 @@ Respond with EXACTLY this JSON object:
 
   try {
     const text = await retryWithBackoff(
-      () => unifiedGenerate(prompt, { temperature: 0.1, model: OLLAMA_CONFIG.MODEL }),
-      'Vocabulary lookup'
+      () => unifiedGenerate(prompt, { temperature: 0.1, model: OLLAMA_CONFIG.MODEL, signal }),
+      'Vocabulary lookup',
+      MAX_RETRIES,
+      signal
     );
     console.log('[LOOKUP VOCAB] raw response for', word, ':', text.substring(0, 400));
 

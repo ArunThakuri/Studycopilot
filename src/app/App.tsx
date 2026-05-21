@@ -743,15 +743,16 @@ function App() {
 
   const handleCreateUnit = async (
     unit: Unit,
-    shouldProcessModules?: boolean
+    shouldProcessModules?: boolean,
+    signal?: AbortSignal
   ) => {
     if (selectedSubject) {
       // If we should process modules, do it BEFORE adding the unit
       if (shouldProcessModules && unit.content?.markdown) {
         console.log('🎬 Processing all modules before navigation...');
-        
+
         // Process all modules and wait for completion
-        await processAllModulesBeforeNavigation(unit, selectedSubject);
+        await processAllModulesBeforeNavigation(unit, selectedSubject, signal);
       } else {
         // Just add the unit and navigate
         const updatedSubject = {
@@ -1006,10 +1007,11 @@ function App() {
   // Process ALL modules BEFORE navigation (new UX flow)
   const processAllModulesBeforeNavigation = async (
     unit: Unit,
-    subject: Subject
+    subject: Subject,
+    signal?: AbortSignal
   ) => {
     const { regenerateModule, getCurrentProvider } = await import('./lib/ai-provider');
-    
+
     const modules: Array<{ name: any; displayName: string }> = [
       { name: 'vocabulary', displayName: 'Vocabulary' },
       { name: 'audioLesson', displayName: 'Audio Lesson' },
@@ -1022,7 +1024,7 @@ function App() {
 
     const markdown = unit.content?.markdown || '';
     const unitTitle = unit.title;
-    
+
     // Add toast for processing start
     toast.info('Generating all learning materials...', {
       description: 'This will take 3-6 minutes. Please wait.',
@@ -1031,11 +1033,16 @@ function App() {
 
     // Process modules sequentially (always, to be safe)
     console.log('⏱️ Processing ALL modules before navigation...');
-    
+
     for (const module of modules) {
+      if (signal?.aborted) {
+        console.log('🛑 Module generation cancelled');
+        throw new Error('Processing cancelled');
+      }
+
       try {
         console.log(`🚀 Processing: ${module.displayName}`);
-        
+
         // Skip Audio Lesson - marked as Coming Soon
         if (module.name === 'audioLesson') {
           console.log('📢 Audio Lesson is Coming Soon (skipping AI processing)');
@@ -1066,7 +1073,8 @@ function App() {
           unitTitle,
           (msg, progress) => {
             console.log(`  ${module.displayName}: ${progress}%`);
-          }
+          },
+          signal
         );
 
         unit.content![module.name] = {
@@ -1074,9 +1082,9 @@ function App() {
           progress: 100,
           data
         };
-        
+
         console.log(`✅ Completed: ${module.displayName}`);
-        
+
         // Add delay between modules (except last one)
         if (module.name !== 'modelQuestion') {
           console.log('⏸️ Waiting 3 seconds before next module...');
@@ -1084,6 +1092,9 @@ function App() {
         }
 
       } catch (error: any) {
+        if (error.message === 'Processing cancelled' || signal?.aborted) {
+          throw error;
+        }
         console.error(`❌ Error processing ${module.displayName}:`, error);
         unit.content![module.name] = {
           status: 'error',
@@ -1095,30 +1106,30 @@ function App() {
 
     // All modules processed! Now add the unit and navigate
     console.log('🎉 All modules processed! Adding unit and navigating...');
-    
+
     // Calculate progress
     const completedModules = Object.keys(unit.content!).filter(key => {
       const mod = unit.content![key];
       return mod && typeof mod === 'object' && mod.status === 'completed';
     }).length;
-    
+
     unit.progress = Math.round((completedModules / 9) * 100);
     unit.completedModules = completedModules;
-    
+
     // Add unit to subject
     const updatedSubject = {
       ...subject,
       units: [...subject.units, unit],
     };
-    
+
     handleUpdateSubject(updatedSubject);
     setSelectedUnit(unit);
-    
+
     // Show success and navigate
     toast.success('All learning materials generated!', {
       description: `${completedModules} out of 9 modules are ready.`
     });
-    
+
     setCurrentView('learning-modules');
   };
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, BookOpen, Upload, X, Loader2, CheckCircle2, Image as ImageIcon, Sparkles, AlertCircle, FileText, Download, Clock } from 'lucide-react';
+import { ArrowLeft, BookOpen, Upload, X, Loader2, CheckCircle2, Image as ImageIcon, Sparkles, AlertCircle, FileText, Download, Clock, StopCircle } from 'lucide-react';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -37,6 +37,7 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
   const [aiGeneratedContent, setAiGeneratedContent] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<{ provider: string; available: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Check current provider on mount
   useEffect(() => {
@@ -44,6 +45,13 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
       console.log(`🤖 Active AI Provider: ${status.provider}`);
       setAiStatus(status);
     });
+  }, []);
+
+  // Abort any in-flight requests on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +105,9 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
   const handleContinueToDashboard = async () => {
     if (!aiGeneratedContent) return;
 
+    // Create new abort controller for module generation
+    abortControllerRef.current = new AbortController();
+
     const newUnit: Unit = {
       id: `unit-${Date.now()}`,
       title: unitTitle,
@@ -129,12 +140,26 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
 
     try {
       // Create unit and process all modules (will navigate when done)
-      await onCreate(newUnit, true); // true = process modules before navigation
+      await onCreate(newUnit, true, abortControllerRef.current.signal); // true = process modules before navigation
     } catch (error: any) {
-      console.error('Error creating unit:', error);
-      setError(`Failed to generate learning materials: ${error?.message || 'Unknown error'}`);
+      if (error.message === 'Processing cancelled' || abortControllerRef.current?.signal.aborted) {
+        setError('Processing was cancelled.');
+      } else {
+        console.error('Error creating unit:', error);
+        setError(`Failed to generate learning materials: ${error?.message || 'Unknown error'}`);
+      }
       setIsProcessing(false);
+    } finally {
+      abortControllerRef.current = null;
     }
+  };
+
+  const handleCancelProcessing = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsProcessing(false);
+    setProcessingStep('');
+    setProgress(0);
   };
 
   const handleCreateUnit = async () => {
@@ -150,6 +175,9 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
 
     setIsProcessing(true);
     setError('');
+
+    // Create abort controller for text extraction
+    abortControllerRef.current = new AbortController();
 
     try {
       // Step 1: Quick extraction - just get the markdown
@@ -168,19 +196,20 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
         (step, progressValue) => {
           setProcessingStep(step);
           setProgress(progressValue);
-        }
+        },
+        abortControllerRef.current.signal
       );
 
       // Store the generated markdown for download
       setGeneratedMarkdown(markdown);
       console.log('✅ Text extracted:', markdown.substring(0, 200));
-      
+
       // Generate title suggestion from the markdown
       setProcessingStep('Generating title suggestion...');
       setProgress(90);
-      
+
       try {
-        const titleSuggestion = await suggestTitleFromMarkdown(markdown, unitTitle);
+        const titleSuggestion = await suggestTitleFromMarkdown(markdown, unitTitle, abortControllerRef.current.signal);
         if (titleSuggestion && titleSuggestion !== unitTitle) {
           setSuggestedTitle(titleSuggestion);
           console.log('💡 Title suggestion:', titleSuggestion);
@@ -198,11 +227,17 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
 
       // Don't auto-redirect, show download/continue options
     } catch (err: any) {
-      console.error('Error processing with AI:', err);
-      setError(`AI processing failed: ${err?.message || 'Unknown error'}`);
+      if (err.message === 'Processing cancelled' || abortControllerRef.current?.signal.aborted) {
+        setError('Processing was cancelled.');
+      } else {
+        console.error('Error processing with AI:', err);
+        setError(`AI processing failed: ${err?.message || 'Unknown error'}`);
+      }
       setIsProcessing(false);
       setProgress(0);
       setProcessingStep('');
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
@@ -490,6 +525,18 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
 
               <Progress value={progress} className="mb-4" />
 
+              {/* Cancel button during processing */}
+              {isProcessing && progress < 100 && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancelProcessing}
+                  className="mt-2 border-destructive text-destructive hover:bg-destructive/10"
+                >
+                  <StopCircle className="w-4 h-4 mr-2" />
+                  Cancel Processing
+                </Button>
+              )}
+
               {progress === 100 && generatedMarkdown ? (
                 <div className="space-y-4 mt-6">
                   {!isProcessing || !processingStep.includes('materials') ? (
@@ -530,6 +577,15 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
                       <p className="text-xs text-muted-foreground mt-2">
                         Please wait - you'll be redirected automatically when complete!
                       </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelProcessing}
+                        className="mt-3 border-destructive text-destructive hover:bg-destructive/10"
+                      >
+                        <StopCircle className="w-4 h-4 mr-2" />
+                        Cancel Processing
+                      </Button>
                     </div>
                   )}
                 </div>
