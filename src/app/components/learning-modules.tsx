@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, ArrowLeft, BookOpen, Loader2, RefreshCw, AlertCircle, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Sparkles, ArrowLeft, BookOpen, Loader2, RefreshCw, AlertCircle, CheckCircle2, MessageSquare, ImageIcon } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ModuleCard } from './module-card';
 import { Progress } from './ui/progress';
@@ -10,6 +10,7 @@ import { AppHeader } from './app-header';
 import { UnitChat } from './unit-chat';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { hasUnitImages } from '../lib/unit-images-store';
 
 interface User {
   name: string;
@@ -246,6 +247,33 @@ export function LearningModules({ subject, unit, user, onBack, onOpenModule, onR
                 </motion.div>
               );
             })}
+
+            {/* Unit Images Card */}
+            {hasUnitImages(unit.id) && (
+              <motion.div
+                key="Unit Images"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: modules.length * 0.05 }}
+                className="relative"
+              >
+                <ModuleCard
+                  icon="🖼️"
+                  title="Unit Images"
+                  moduleName="unitImages"
+                  description="View the textbook images uploaded for this unit"
+                  color="teal"
+                  canRegenerate={false}
+                  status="Ready"
+                  onClick={() => onOpenModule('Unit Images')}
+                />
+                <div className="absolute top-2 left-2">
+                  <div className="bg-primary rounded-full p-1 shadow-sm">
+                    <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
       </main>

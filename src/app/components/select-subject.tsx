@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { StudyCopilotLogo } from './landing-page';
 import { Card } from './ui/card';
 import { Subject } from '../App';
+import { generateSlug } from '../lib/routing';
 
 interface SelectSubjectProps {
   userGrade: number;
@@ -133,7 +134,7 @@ export function SelectSubject({ userGrade, onBack, onSelectExisting, onCreateNew
                   whileHover={{ scale: 1.02, y: -2 }}
                   className="cursor-pointer"
                   onClick={() => {
-                    const uniqueSubject = { ...subject, id: `subject-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
+                    const uniqueSubject = { ...subject, id: `subject-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, slug: generateSlug(subject.title) };
                     onSelectExisting(uniqueSubject);
                   }}
                 >

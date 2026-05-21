@@ -7,7 +7,25 @@ export type View =
   | 'units-dashboard' | 'create-unit' | 'learning-modules'
   | 'profile' | 'unit-text' | 'audio-lesson' | 'vocabulary'
   | 'summary' | 'exercises' | 'interactive' | 'practice'
-  | 'model-question' | 'markdown-editor' | 'admin-panel';
+  | 'model-question' | 'markdown-editor' | 'admin-panel'
+  | 'unit-images';
+
+export function generateSlug(title: string, existingSlugs: string[] = []): string {
+  let slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  if (!slug) slug = 'subject';
+
+  let uniqueSlug = slug;
+  let counter = 1;
+  while (existingSlugs.includes(uniqueSlug)) {
+    uniqueSlug = `${slug}-${counter}`;
+    counter++;
+  }
+  return uniqueSlug;
+}
 
 interface RouteInfo {
   view: View;
@@ -37,6 +55,7 @@ export function viewToPath(view: View, subjectId?: string, unitId?: string): str
     case 'practice': return unitId ? `/unit/${unitId}/practice` : '/dashboard';
     case 'model-question': return unitId ? `/unit/${unitId}/model-question` : '/dashboard';
     case 'markdown-editor': return unitId ? `/unit/${unitId}/markdown` : '/dashboard';
+    case 'unit-images': return unitId ? `/unit/${unitId}/images` : '/dashboard';
     case 'profile': return '/profile';
     case 'admin-panel': return '/admin';
     default: return '/';
@@ -91,11 +110,14 @@ export function parsePath(path: string): RouteInfo {
   const unitMarkdownMatch = path.match(/^\/unit\/([^/]+)\/markdown$/);
   if (unitMarkdownMatch) return { view: 'markdown-editor', unitId: unitMarkdownMatch[1] };
 
+  const unitImagesMatch = path.match(/^\/unit\/([^/]+)\/images$/);
+  if (unitImagesMatch) return { view: 'unit-images', unitId: unitImagesMatch[1] };
+
   return { view: 'landing' };
 }
 
 export function findSubjectById(subjects: Subject[], subjectId: string): Subject | null {
-  return subjects.find(s => s.id === subjectId) || null;
+  return subjects.find(s => s.id === subjectId || s.slug === subjectId) || null;
 }
 
 export function findUnitById(subjects: Subject[], unitId: string): { subject: Subject; unit: Unit } | null {

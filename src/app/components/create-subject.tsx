@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { toast } from 'sonner';
+import { generateSlug } from '../lib/routing';
 
 interface Subject {
   id: string;
@@ -16,6 +17,7 @@ interface Subject {
   publication?: string;
   author?: string;
   units: string[];
+  slug?: string;
 }
 
 interface CreateSubjectProps {
@@ -40,6 +42,7 @@ export function CreateSubject({ userGrade, onBack, onCreate }: CreateSubjectProp
       publication: formData.publication,
       author: formData.author,
       units: [],
+      slug: generateSlug(formData.title),
     };
 
     onCreate(newSubject);

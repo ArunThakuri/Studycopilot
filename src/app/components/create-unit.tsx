@@ -9,6 +9,8 @@ import { Progress } from './ui/progress';
 import { Subject, User } from '../App';
 import { Unit } from './units-dashboard';
 import { processUnitQuickly, getAIProviderStatus, suggestTitleFromMarkdown, createInitialContentStructure } from '../lib/ai-provider';
+import { saveUnitImages } from '../lib/unit-images-store';
+import { fileToDataUrl } from '../lib/ai-service';
 import { AppHeader } from './app-header';
 
 interface CreateUnitProps {
@@ -94,7 +96,7 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
 
   const handleContinueToDashboard = async () => {
     if (!aiGeneratedContent) return;
-    
+
     const newUnit: Unit = {
       id: `unit-${Date.now()}`,
       title: unitTitle,
@@ -108,12 +110,22 @@ export function CreateUnit({ subject, user, onBack, onCreate, onLogout, onOpenPr
       suggestedTitle: suggestedTitle || undefined,
       imageCount: uploadedImages.length,
     };
-    
+
+    // Convert uploaded images to data URLs and persist them
+    if (uploadedImages.length > 0) {
+      try {
+        const imageDataUrls = await Promise.all(uploadedImages.map(file => fileToDataUrl(file)));
+        saveUnitImages(newUnit.id, imageDataUrls);
+      } catch (e) {
+        console.error('Failed to save unit images:', e);
+      }
+    }
+
     // Show processing state
     setProcessingStep('Generating all learning materials...');
     setProgress(0);
     setIsProcessing(true);
-    
+
     try {
       // Create unit and process all modules (will navigate when done)
       await onCreate(newUnit, true); // true = process modules before navigation

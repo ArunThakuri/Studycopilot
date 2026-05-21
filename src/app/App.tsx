@@ -20,6 +20,7 @@ import { AudioLesson } from './components/audio-lesson';
 import { ModelQuestion } from './components/model-question';
 import { SelectSubject } from './components/select-subject';
 import { MarkdownEditor } from './components/markdown-editor';
+import { UnitImages } from './components/unit-images';
 import { AdminPanel } from './components/admin-panel';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
@@ -30,7 +31,7 @@ import { saveUserData, loadUserData } from './lib/data-service';
 
 import { Onboarding } from './components/onboarding';
 import { ThemeProvider } from './components/theme-provider';
-import { viewToPath, parsePath, findSubjectById, findUnitById, View as RouteView } from './lib/routing';
+import { viewToPath, parsePath, findSubjectById, findUnitById, generateSlug, View as RouteView } from './lib/routing';
 
 type View = RouteView;
 
@@ -47,6 +48,7 @@ export interface Subject {
   progress?: number;
   totalUnits?: number;
   completedUnits?: number;
+  slug?: string;
 }
 
 export interface User {
@@ -76,7 +78,8 @@ export interface Activity {
 // Admin email configuration - CHANGE THIS TO YOUR EMAIL
 // NOTE: Emails must be in lowercase
 const ADMIN_EMAILS = [
-  'winnerarun5@gmail.com', // Replace with your actual email
+  'winnerarun5@gmail.com',
+  'looserarun5@gmail.com',
 ];
 
 // Helper function to check if user is admin
@@ -107,6 +110,23 @@ function App() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [urlProcessed, setUrlProcessed] = useState(false);
+
+  // Migrate existing subjects to add slugs once data is loaded
+  useEffect(() => {
+    if (!isSessionChecked) return;
+    const needsMigration = subjects.some(s => !s.slug);
+    if (needsMigration) {
+      const existingSlugs = subjects.map(s => s.slug).filter(Boolean) as string[];
+      const migrated = subjects.map(s => {
+        if (s.slug) return s;
+        const slug = generateSlug(s.title, existingSlugs);
+        existingSlugs.push(slug);
+        return { ...s, slug };
+      });
+      setSubjects(migrated);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSessionChecked, subjects]);
   const [activities, setActivities] = useState<Activity[]>(() => {
     // Load activities from localStorage on initial mount
     const saved = localStorage.getItem('studycopilot_activities');
@@ -488,7 +508,7 @@ function App() {
   // 2. Keep URL in sync with current view (after initial load is processed)
   useEffect(() => {
     if (!urlProcessed) return;
-    const path = viewToPath(currentView, selectedSubject?.id, selectedUnit?.id);
+    const path = viewToPath(currentView, selectedSubject?.slug || selectedSubject?.id, selectedUnit?.id);
     if (window.location.pathname !== path) {
       window.history.pushState(null, '', path);
     }
@@ -898,6 +918,8 @@ function App() {
       setCurrentView('practice');
     } else if (moduleTitle === 'Model Question') {
       setCurrentView('model-question');
+    } else if (moduleTitle === 'Unit Images') {
+      setCurrentView('unit-images');
     }
   };
 
@@ -1565,6 +1587,19 @@ function App() {
         user={user}
         onBack={() => setCurrentView('learning-modules')}
         onRegenerate={() => handleRegenerateModule(selectedUnit.id, 'modelQuestion')}
+        onLogout={handleLogout}
+        onOpenProfile={handleViewProfile}
+      />
+    );
+  }
+
+  if (currentView === 'unit-images' && selectedSubject && selectedUnit) {
+    return (
+      <UnitImages
+        subject={selectedSubject}
+        unit={selectedUnit}
+        user={user}
+        onBack={() => setCurrentView('learning-modules')}
         onLogout={handleLogout}
         onOpenProfile={handleViewProfile}
       />

@@ -443,7 +443,7 @@ export async function listAvailableModels(): Promise<Array<{ id: string; name: s
 // Core AI Functions
 // ============================================
 
-async function fileToDataUrl(file: File): Promise<string> {
+export async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
@@ -496,7 +496,7 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
         () => unifiedGenerate(buildPrompt(i + 1, base64Images.length), {
           model: VISION_MODEL,
           temperature: 0.1,
-          maxTokens: 8192,
+          maxTokens: 16000,
           images: [base64Images[i]],
         }),
         `Image ${i + 1} text extraction`
@@ -504,7 +504,9 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
       if (text && text.trim().length > 0) pages.push(text.trim());
     } catch (error: any) {
       console.error(`Error extracting page ${i + 1}:`, error);
-      throw new Error(`AI vision error on page ${i + 1} of ${base64Images.length}: ${error.message}`);
+      // Continue with remaining pages instead of failing the entire upload.
+      // Record a placeholder so the user knows which page failed.
+      pages.push(`\n> **Page ${i + 1}:** Text extraction failed — ${error.message}\n`);
     }
   }
 
@@ -539,6 +541,17 @@ export async function cleanAndStructureText(
 ): Promise<string> {
   onProgress?.('Formatting and structuring full content...');
 
+  // For long documents, skip the AI cleaning step entirely.
+  // The per-page extraction already produces well-formatted markdown.
+  // Re-processing a 17-page document through the AI with a 4096-8192 token
+  // output limit causes truncation — content from later pages gets cut off.
+  const MAX_SAFE_CLEAN_LENGTH = 4000;
+  if (markdown.length > MAX_SAFE_CLEAN_LENGTH) {
+    console.log(`[cleanAndStructureText] Document is ${markdown.length} chars — skipping AI cleaning to avoid truncation.`);
+    onProgress?.('Content preserved (skipped re-formatting for large document)');
+    return markdown;
+  }
+
   const prompt = `You are an expert document formatting assistant. Format this raw textbook transcription into clean, well-structured markdown while PRESERVING ALL CONTENT EXACTLY.
 
 CRITICAL: Keep EVERY SINGLE WORD. Do NOT summarize, shorten, or remove anything.
@@ -553,7 +566,7 @@ ${markdown}
 STRUCTURED COMPLETE CONTENT:`;
 
   try {
-    let cleanedText = await unifiedGenerate(prompt, { temperature: 0.3, model: OLLAMA_CONFIG.MODEL });
+    let cleanedText = await unifiedGenerate(prompt, { temperature: 0.3, maxTokens: 8192, model: OLLAMA_CONFIG.MODEL });
     cleanedText = cleanedText.trim();
     if (cleanedText.startsWith('```')) {
       cleanedText = cleanedText.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
