@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 import { Progress } from './ui/progress';
 import { Subject } from '../App';
 import { Unit } from './units-dashboard';
-import { ExerciseRenderer } from './exercise-renderer';
+import { MarkdownRenderer } from './markdown-renderer';
 import { AppHeader } from './app-header';
 import { motion } from 'motion/react';
 
@@ -104,7 +104,9 @@ export function Exercises({ subject, unit, user, onBack, onNextModule, onPreviou
               )}
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <ExerciseRenderer content={exercisesText} />
+              <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert">
+                <MarkdownRenderer content={exercisesText} />
+              </div>
             </motion.div>
           </>
         )}
