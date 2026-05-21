@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 import { Progress } from './ui/progress';
 import { Subject } from '../App';
 import { Unit } from './units-dashboard';
-import { MarkdownRenderer } from './markdown-renderer';
+import { ExerciseRenderer } from './exercise-renderer';
 import { AppHeader } from './app-header';
 import { motion } from 'motion/react';
 
@@ -92,7 +92,10 @@ export function Exercises({ subject, unit, user, onBack, onNextModule, onPreviou
                 <div className="w-10 h-10 bg-gradient-to-br from-secondary to-primary rounded-2xl flex items-center justify-center text-lg shadow-md shadow-primary/10">
                   {subject.icon || '📚'}
                 </div>
-                <h1 className="text-2xl font-bold font-display text-foreground">Exercise Solutions</h1>
+                <div>
+                  <h1 className="text-2xl font-bold font-display text-foreground">Exercise Solutions</h1>
+                  <p className="text-sm text-muted-foreground font-semibold">{unit.title}</p>
+                </div>
               </div>
               {onRegenerate && (
                 <Button variant="outline" size="sm" onClick={onRegenerate} className="border-2 border-border rounded-xl font-semibold">
@@ -100,10 +103,8 @@ export function Exercises({ subject, unit, user, onBack, onNextModule, onPreviou
                 </Button>
               )}
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-2xl border-2 border-border p-6 sm:p-8 mb-6">
-              <div className="prose prose-sm max-w-none">
-                <MarkdownRenderer content={exercisesText} />
-              </div>
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+              <ExerciseRenderer content={exercisesText} />
             </motion.div>
           </>
         )}

@@ -711,21 +711,35 @@ SUMMARY (markdown formatted):`;
 }
 
 export async function generateExercises(markdown: string): Promise<string> {
-  const prompt = `You are an expert tutor. Find every exercise, question, or problem in the following textbook content and provide a complete, step-by-step solution for each.
+  const prompt = `You are an expert tutor. Find EVERY exercise, question, or problem in the following textbook content and provide a complete, step-by-step solution for each.
 
-Rules:
-- Do NOT invent questions that are not in the content.
-- Use the SAME LANGUAGE as the content.
-- Format each section with markdown headings: ### 1. Section Name
-- Bold each question: **a. Question text**
-- Provide the answer/solution immediately after each question on a new line.
-- For math/science problems, show all working steps.
+OUTPUT RULES — FOLLOW EXACTLY:
+1. Use the SAME LANGUAGE as the content. Do NOT translate.
+2. Do NOT invent questions that are not in the content.
+3. Group exercises by their original section using markdown headings:
+   ### Section 1: Fill in the blanks
+   ### Section 2: Short Answer Questions
+   etc.
+4. Format each sub-question on its own line starting with **Q.**
+5. Provide the solution immediately after the question, starting with **Solution:**
+6. For math/science problems, show ALL working steps clearly.
+7. Add a blank line between every question and its solution for clean parsing.
+8. Keep the original question numbering (a, b, c, 1, 2, 3, etc.).
 
 EXAMPLE FORMAT:
-### 1. Fill in the blanks
-**a. Water boils at ______ °C.**
+### Section 1: Fill in the blanks
+**Q. a. Water boils at ______ °C.**
 
-**Answer:** 100°C
+**Solution:** 100°C
+
+**Q. b. The SI unit of force is ______.**
+
+**Solution:** Newton (N)
+
+### Section 2: Short Answer Questions
+**Q. 1. Define photosynthesis.**
+
+**Solution:** Photosynthesis is the process by which green plants use sunlight, water, and carbon dioxide to produce glucose and oxygen.
 
 CONTENT:
 ${markdown}
