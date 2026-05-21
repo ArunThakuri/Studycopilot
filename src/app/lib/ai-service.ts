@@ -140,11 +140,16 @@ async function directGenerate(
     body.images = options.images;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for direct Ollama
+
   const response = await fetch(`${DIRECT_URL}/api/generate`, {
     method: 'POST',
     headers: getDirectHeaders(),
     body: JSON.stringify(body),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => `Ollama error ${response.status}`);
@@ -181,11 +186,16 @@ async function directChat(
     },
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+
   const response = await fetch(`${DIRECT_URL}/api/chat`, {
     method: 'POST',
     headers: getDirectHeaders(),
     body: JSON.stringify(body),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => `Ollama chat error ${response.status}`);
@@ -217,6 +227,9 @@ async function serverGenerate(
     images?: string[];
   } = {}
 ): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 150000); // 150s timeout for Edge Function
+
   const response = await fetch(`${EDGE_URL}/ai/generate`, {
     method: 'POST',
     headers: getEdgeHeaders(),
@@ -228,7 +241,9 @@ async function serverGenerate(
       maxTokens: options.maxTokens,
       images: options.images,
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: `Server error ${response.status}` }));
