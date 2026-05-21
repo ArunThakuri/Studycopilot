@@ -452,6 +452,36 @@ export async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+// Resize images to reduce payload size before sending to AI.
+// Large textbook scans can be 3-5MB each; resizing to 1600px wide at 85% JPEG
+// quality keeps text readable while cutting size to ~300-800KB.
+function resizeImage(file: File, maxWidth = 1600, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas context not available'));
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      URL.revokeObjectURL(img.src);
+      resolve(dataUrl);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error(`Failed to load image: ${file.name}`));
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export async function generateMarkdownFromImages(
   images: File[],
   unitTitle: string,
@@ -459,10 +489,20 @@ export async function generateMarkdownFromImages(
 ): Promise<string> {
   if (images.length === 0) throw new Error('No images provided');
 
-  onProgress?.('Converting images...');
-  const imageDataUrls = await Promise.all(images.map(async (img) => ({
-    dataUrl: await fileToDataUrl(img),
-  })));
+  onProgress?.('Resizing and converting images...');
+  const imageDataUrls = await Promise.all(images.map(async (img, idx) => {
+    const originalSize = Math.round(img.size / 1024);
+    try {
+      const dataUrl = await resizeImage(img, 1600, 0.85);
+      const resizedSize = Math.round((dataUrl.length * 0.75) / 1024); // base64 ≈ 4/3 of binary
+      console.log(`📸 Image ${idx + 1}: ${originalSize}KB → ~${resizedSize}KB (${img.name || 'upload'})`);
+      return { dataUrl, resized: true };
+    } catch (e) {
+      console.warn(`Resize failed for image ${idx + 1}, using original:`, e);
+      const dataUrl = await fileToDataUrl(img);
+      return { dataUrl, resized: false };
+    }
+  }));
 
   const base64Images = imageDataUrls.map(img => {
     const match = img.dataUrl.match(/^data:image\/\w+;base64,(.+)$/);
@@ -501,7 +541,12 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
         }),
         `Image ${i + 1} text extraction`
       );
-      if (text && text.trim().length > 0) pages.push(text.trim());
+      if (text && text.trim().length > 0) {
+        console.log(`📝 Page ${i + 1} extracted: ${text.trim().length} chars`);
+        pages.push(text.trim());
+      } else {
+        console.warn(`⚠️ Page ${i + 1} returned empty text`);
+      }
     } catch (error: any) {
       console.error(`Error extracting page ${i + 1}:`, error);
       // Continue with remaining pages instead of failing the entire upload.
@@ -513,7 +558,7 @@ Then transcribe the exact text from this image. Nothing more, nothing less.`;
   const combined = pages.join('\n\n');
   if (!combined || combined.trim().length === 0) throw new Error('AI returned empty response');
 
-  console.log('Generated markdown, length:', combined.length);
+  console.log(`✅ Generated markdown: ${combined.length} chars from ${pages.length} pages`);
   onProgress?.('Markdown generated successfully!');
   return combined;
 }
