@@ -1025,6 +1025,24 @@ function App() {
     const markdown = unit.content?.markdown || '';
     const unitTitle = unit.title;
 
+    // Persist the unit BEFORE running module generation so the extracted
+    // markdown survives any module failure / cancellation / refresh.
+    // Modules start as 'pending'; we update incrementally as each completes.
+    let currentSubject: Subject = {
+      ...subject,
+      units: [...subject.units, unit],
+    };
+    handleUpdateSubject(currentSubject);
+
+    // Helper: persist the latest unit state back into the subject
+    const persistUnit = () => {
+      currentSubject = {
+        ...currentSubject,
+        units: currentSubject.units.map(u => (u.id === unit.id ? unit : u)),
+      };
+      handleUpdateSubject(currentSubject);
+    };
+
     // Add toast for processing start
     toast.info('Generating all learning materials...', {
       description: 'This will take 3-6 minutes. Please wait.',
@@ -1034,10 +1052,12 @@ function App() {
     // Process modules sequentially (always, to be safe)
     console.log('⏱️ Processing ALL modules before navigation...');
 
+    let wasCancelled = false;
     for (const module of modules) {
       if (signal?.aborted) {
-        console.log('🛑 Module generation cancelled');
-        throw new Error('Processing cancelled');
+        console.log('🛑 Module generation cancelled — unit and markdown remain saved');
+        wasCancelled = true;
+        break;
       }
 
       try {
@@ -1084,6 +1104,7 @@ function App() {
         };
 
         console.log(`✅ Completed: ${module.displayName}`);
+        persistUnit();
 
         // Add delay between modules (except last one)
         if (module.name !== 'modelQuestion') {
@@ -1093,7 +1114,8 @@ function App() {
 
       } catch (error: any) {
         if (error.message === 'Processing cancelled' || signal?.aborted) {
-          throw error;
+          wasCancelled = true;
+          break;
         }
         console.error(`❌ Error processing ${module.displayName}:`, error);
         unit.content![module.name] = {
@@ -1101,13 +1123,15 @@ function App() {
           progress: 0,
           error: error.message || 'Processing failed'
         };
+        persistUnit();
       }
     }
 
-    // All modules processed! Now add the unit and navigate
-    console.log('🎉 All modules processed! Adding unit and navigating...');
+    // Calculate final progress and navigate to the (possibly partial) unit.
+    // Cancellation is treated as partial completion — the user keeps whatever
+    // was generated and can regenerate pending/failed modules later.
+    console.log(wasCancelled ? '🛑 Stopped early — saving partial unit' : '🎉 All modules processed!');
 
-    // Calculate progress
     const completedModules = Object.keys(unit.content!).filter(key => {
       const mod = unit.content![key];
       return mod && typeof mod === 'object' && mod.status === 'completed';
@@ -1115,20 +1139,18 @@ function App() {
 
     unit.progress = Math.round((completedModules / 9) * 100);
     unit.completedModules = completedModules;
-
-    // Add unit to subject
-    const updatedSubject = {
-      ...subject,
-      units: [...subject.units, unit],
-    };
-
-    handleUpdateSubject(updatedSubject);
+    persistUnit();
     setSelectedUnit(unit);
 
-    // Show success and navigate
-    toast.success('All learning materials generated!', {
-      description: `${completedModules} out of 9 modules are ready.`
-    });
+    if (wasCancelled) {
+      toast.info('Processing stopped — partial unit saved', {
+        description: `${completedModules} of 9 modules ready. Open a module to generate the rest.`
+      });
+    } else {
+      toast.success('All learning materials generated!', {
+        description: `${completedModules} out of 9 modules are ready.`
+      });
+    }
 
     setCurrentView('learning-modules');
   };

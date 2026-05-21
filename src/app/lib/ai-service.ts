@@ -1009,9 +1009,12 @@ MODEL QUESTION PAPER:`;
 
 export async function suggestTitleFromMarkdown(markdownContent: string, currentTitle?: string, signal?: AbortSignal): Promise<string> {
   if (signal?.aborted) throw new Error('Processing cancelled');
+  // First ~1500 chars is plenty to derive a 3-7 word title; sending the full
+  // markdown wastes input tokens with no quality gain.
+  const sample = markdownContent.length > 1500 ? markdownContent.slice(0, 1500) : markdownContent;
   const prompt = `Suggest a short (3-7 word) title for this content. Just the title, nothing else.
 ${currentTitle ? `Current: ${currentTitle}` : ''}
-Content: ${markdownContent}
+Content: ${sample}
 TITLE:`;
 
   try {

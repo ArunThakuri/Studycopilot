@@ -35,7 +35,11 @@ export function SubjectCard({ title, units, completed, progress, badge, icon, co
   const confirmEdit = () => { if (editedTitle.trim() && onEdit) onEdit(editedTitle.trim()); setShowEditDialog(false); };
   const confirmDelete = () => { if (onDelete) onDelete(); setShowDeleteDialog(false); };
 
-  const Dialogs = () => (
+  // NOTE: this is a JSX value, NOT a component function. Defining it as a
+  // `const Dialogs = () => (...)` and rendering `<Dialogs />` would create a
+  // new component type on every keystroke, unmounting/remounting the Input
+  // and dropping characters.
+  const dialogs = (
     <>
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="rounded-2xl border-2 border-primary/10">
@@ -95,7 +99,7 @@ export function SubjectCard({ title, units, completed, progress, badge, icon, co
             </DropdownMenu>
           </div>
         </motion.div>
-        <Dialogs />
+        {dialogs}
       </>
     );
   }
@@ -138,7 +142,7 @@ export function SubjectCard({ title, units, completed, progress, badge, icon, co
           </div>
         </div>
       </motion.div>
-      <Dialogs />
+      {dialogs}
     </>
   );
 }

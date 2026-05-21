@@ -88,21 +88,12 @@ export async function processUnitQuickly(
       );
 
       console.log('Text extracted successfully!');
-      onProgress?.('Text extracted!', 70);
+      onProgress?.('Text extracted!', 90);
 
-      let processedMarkdown = extractedMarkdown;
-      try {
-        onProgress?.('Cleaning and structuring text...', 80);
-        processedMarkdown = await AIService.cleanAndStructureText(
-          extractedMarkdown,
-          (msg) => onProgress?.(msg, 90),
-          signal
-        );
-        console.log('Text cleaned and structured!');
-      } catch (error) {
-        if (signal?.aborted || (error as Error).message === 'Processing cancelled') throw error;
-        console.error('Could not clean text, using extracted version:', error);
-      }
+      // The vision prompt already produces structured markdown. A second AI
+      // "clean and structure" pass roughly doubles token usage on short units
+      // with no quality gain — just strip stray code fences inline.
+      const processedMarkdown = stripCodeFences(extractedMarkdown);
 
       onProgress?.('Formatting text...', 95);
       const formattedHtml = markdownToHtml(processedMarkdown);
@@ -231,6 +222,14 @@ export function createInitialContentStructure(markdown: string, unitText: string
     practiceQuestions: { status: 'pending' },
     modelQuestion: { status: 'completed', progress: 100, data: '📋 Coming Soon' },
   };
+}
+
+function stripCodeFences(text: string): string {
+  let out = text.trim();
+  if (out.startsWith('```')) {
+    out = out.replace(/^```\w*\s*/, '').replace(/```\s*$/, '').trim();
+  }
+  return out;
 }
 
 function markdownToHtml(markdown: string): string {

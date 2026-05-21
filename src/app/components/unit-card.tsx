@@ -62,7 +62,11 @@ export function UnitCard({ unit, onClick, onEdit, onDelete, onAcceptSuggestion, 
   const availableModules = getAvailableModules();
   const isCompleted = unit.progress === 100;
 
-  const Dialogs = () => (
+  // NOTE: this is a JSX value, NOT a component function. Defining it as a
+  // `const Dialogs = () => (...)` and rendering `<Dialogs />` would create a
+  // new component type on every keystroke, unmounting/remounting the Input
+  // and dropping characters.
+  const dialogs = (
     <>
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent onClick={(e) => e.stopPropagation()} className="rounded-2xl border-2 border-primary/10">
@@ -167,7 +171,7 @@ export function UnitCard({ unit, onClick, onEdit, onDelete, onAcceptSuggestion, 
             <Play className="w-4 h-4 mr-2" />Enter
           </Button>
         </motion.div>
-        <Dialogs />
+        {dialogs}
       </>
     );
   }
@@ -253,7 +257,7 @@ export function UnitCard({ unit, onClick, onEdit, onDelete, onAcceptSuggestion, 
           </Button>
         </div>
       </motion.div>
-      <Dialogs />
+      {dialogs}
     </>
   );
 }

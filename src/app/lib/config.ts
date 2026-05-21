@@ -12,7 +12,7 @@ export const OLLAMA_CONFIG = {
   API_KEY: import.meta.env.VITE_OLLAMA_API_KEY || '',
   USE_DIRECT: import.meta.env.VITE_USE_DIRECT_OLLAMA !== 'false',
   MODEL: 'deepseek-v4-flash:cloud',
-  VISION_MODEL: 'gemma4',
+  VISION_MODEL: 'gemma4:31b-cloud',
 };
 
 export const AI_CONFIG = {
